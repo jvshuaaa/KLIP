@@ -1,6 +1,14 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export default function Produk() {
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    setRole(localStorage.getItem('auth_user_role'));
+  }, []);
+
+  const showChat = role === 'User' || role === 'Psikolog';
+
   return (
     <section
       className="
@@ -36,64 +44,91 @@ export default function Produk() {
             Patnal di sini buat bantu kamu cari solusi.
           </p>
 
-          <div className="flex md:justify-start justify-center mt-6">
-            <a
-              href="https://konsultasi.klinikpatnal.com/"
-              className="
-            group relative rounded-2xl px-7 py-5
-            flex items-center justify-between 
-            w-full md:w-[540px] lg:w-[580px]
-            bg-white 
-            border border-gray-200/70 shadow-sm
-            hover:shadow-lg hover:border-blue-100
-            transition-all duration-300
-          "
-            >
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-50/30 to-white opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none"></div>
+          <div className={`flex md:justify-start justify-center mt-6 gap-4 flex-wrap`}>
+            {/* ── Chat Card (User & Psikolog only) — kiri ── */}
+            {showChat && (
+              <a
+                href="/chat"
+                className={`
+                group relative rounded-2xl px-6 py-5
+                flex items-center justify-between
+                w-full md:w-[540px] lg:w-[580px]
+                bg-white
+                border border-gray-200/70 shadow-sm
+                hover:shadow-lg hover:border-indigo-100
+                transition-all duration-300
+              `}
+              >
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-50/30 to-white opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none"></div>
 
-              <div className="text-left relative z-10 space-y-1.5">
-                <p className="text-gray-500 text-sm">Konsultasi untuk saya</p>
+                <div className="text-left relative z-10 space-y-1.5">
+                  <p className="text-gray-500 text-sm">💬 Fitur Chat</p>
 
-                <h3 className="text-blue-600 font-bold text-2xl tracking-tight group-hover:text-blue-700 transition-colors">
-                  Konsultasi
-                </h3>
+                  <h3 className="text-indigo-600 font-bold text-xl tracking-tight group-hover:text-indigo-700 transition-colors">
+                    Chat dengan Psikolog
+                  </h3>
 
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Layanan konsultasi profesional.
-                </p>
+                  <p className="text-gray-600 text-xs leading-relaxed">
+                    Konsultasi langsung dari psikolog bersertifikat kami.<br />
+                    <span className="text-gray-400">(Setelah menyelesaikan profiling)</span>
+                  </p>
 
-                <div className="flex items-center gap-1 text-blue-600 text-sm font-medium pt-1">
-                  <span className="transition-all duration-300 group-hover:translate-x-1">
-                    Pilih
-                  </span>
-
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="size-4 transition-all duration-300 opacity-80 group-hover:opacity-100 group-hover:translate-x-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
+                  <div className="flex items-center gap-1 text-indigo-600 text-sm font-medium pt-1">
+                    <span className="transition-all duration-300 group-hover:translate-x-1">Mulai Chat</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 transition-all duration-300 opacity-80 group-hover:opacity-100 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
 
-              <img
-                src="/images/konsultasi.png"
-                alt="Konsultasi"
+                <div className="relative z-10 w-14 h-14 flex items-center justify-center text-4xl flex-shrink-0 transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-0.5">
+                  💬
+                </div>
+              </a>
+            )}
+
+            {/* ── Konsultasi Card (guest only) ── */}
+            {!showChat && (
+              <a
+                href="/consultation"
                 className="
-              w-20 h-20 object-contain relative z-10
+              group relative rounded-2xl px-6 py-5
+              flex items-center justify-between
+              bg-white
+              border border-gray-200/70 shadow-sm
+              hover:shadow-lg hover:border-blue-100
               transition-all duration-300
-              group-hover:scale-105 group-hover:-translate-y-0.5
+              w-full md:w-[540px] lg:w-[580px]
             "
-              />
-            </a>
+              >
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-50/30 to-white opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none"></div>
+
+                <div className="text-left relative z-10 space-y-1.5">
+                  <p className="text-gray-500 text-sm">Konsultasi untuk saya</p>
+
+                  <h3 className="text-blue-600 font-bold text-xl tracking-tight group-hover:text-blue-700 transition-colors">
+                    Konsultasi
+                  </h3>
+
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Layanan konsultasi profesional.
+                  </p>
+
+                  <div className="flex items-center gap-1 text-blue-600 text-sm font-medium pt-1">
+                    <span className="transition-all duration-300 group-hover:translate-x-1">Pilih</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 transition-all duration-300 opacity-80 group-hover:opacity-100 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+
+                <img
+                  src="/images/konsultasi.png"
+                  alt="Konsultasi"
+                  className="w-16 h-16 object-contain relative z-10 flex-shrink-0 transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-0.5"
+                />
+              </a>
+            )}
           </div>
         </div>
 

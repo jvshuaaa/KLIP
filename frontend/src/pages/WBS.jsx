@@ -1,11 +1,24 @@
 import MainLayout from "../layouts/MainLayout";
 import { useEffect, useState, useRef } from "react";
+import api from "../lib/axios";
 
 export default function WBS() {
   useEffect(() => {
     document.title = "Klinik Patnal - WBS";
   }, []);
   const [step, setStep] = useState(1);
+  const [serverStatus, setServerStatus] = useState();
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .get('/api/ping')
+      .then(() => mounted && setServerStatus('online'))
+      .catch(() => mounted && setServerStatus('offline'));
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // --- Step 1 data ---
   const [dataInfo, setDataInfo] = useState({
@@ -153,6 +166,16 @@ export default function WBS() {
   return (
     <MainLayout>
       <div className="w-full max-w-none p-6 md:p-10 bg-white ">
+        {/* Server status */}
+        <div className="mb-4">
+          {typeof serverStatus !== 'undefined' ? (
+            serverStatus === 'online' ? (
+              <div className="text-sm text-green-700 bg-green-50 inline-block px-3 py-1 rounded">Server: Online</div>
+            ) : (
+              <div className="text-sm text-red-700 bg-red-50 inline-block px-3 py-1 rounded">Server: Offline</div>
+            )
+          ) : null}
+        </div>
         {/* Header */}
         <header className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">

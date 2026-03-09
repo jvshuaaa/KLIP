@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../lib/axios";
 
 export default function Profil({ initialUser }) {
+  const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
   const [user, setUser] = useState(initialUser);
   const [editField, setEditField] = useState({});
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
 
   const toggleEdit = (field) => {
-    if (field === "status") return;
+    if (field === "status" || field === "status_pengguna") return;
     setEditField({ ...editField, [field]: !editField[field] });
   };
 
@@ -13,21 +21,100 @@ export default function Profil({ initialUser }) {
     setUser({ ...user, [field]: value });
   };
 
-  const handleSave = () => {
-    alert("Perubahan disimpan (dummy)");
-    setEditField({});
-  };
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-  const handleFotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const fotoURL = URL.createObjectURL(file);
-      setUser({ ...user, foto: fotoURL });
+      const payload = {
+        name: user.nama,
+        email: user.email,
+        no_wa: user.no_wa,
+        pangkat_golongan: user.pangkat,
+        jabatan: user.jabatan,
+        bagian: user.bagian,
+        organization_detail: user.unit,
+      };
+
+      const response = await api.put("/api/profile/update", payload);
+      const updatedUser = response?.data?.user;
+
+      if (updatedUser) {
+        setUser((prev) => ({
+          ...prev,
+          nama: updatedUser.name || prev.nama,
+          email: updatedUser.email || prev.email,
+          no_wa: updatedUser.no_wa || prev.no_wa,
+          pangkat: updatedUser.pangkat_golongan || prev.pangkat,
+          jabatan: updatedUser.jabatan || prev.jabatan,
+          bagian: updatedUser.bagian || prev.bagian,
+          unit: updatedUser.organization_detail || updatedUser.daftar_sebagai || prev.unit,
+        }));
+      }
+
+      alert("Perubahan disimpan");
+      setEditField({});
+    } catch (error) {
+      alert(
+        error?.response?.data?.errors?.email?.[0] ||
+        error?.response?.data?.errors?.no_wa?.[0] ||
+        error?.response?.data?.message ||
+        "Gagal menyimpan perubahan"
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleFotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      alert("File harus berupa gambar (image).");
+      return;
+    }
+
+    if (file.size > 1 * 1024 * 1024) {
+      alert("Ukuran foto maksimal 1MB.");
+      return;
+    }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+    setUser({ ...user, foto: localPreviewUrl });
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("foto", file);
+      formData.append("foto_position_x", String(user?.foto_position_x ?? 50));
+      formData.append("foto_position_y", String(user?.foto_position_y ?? 50));
+      const response = await api.post("/api/profile/update-foto", formData);
+      setUser((prev) => ({
+        ...prev,
+        foto: response.data?.foto || localPreviewUrl,
+        foto_position_x: Number(response.data?.foto_position_x ?? prev.foto_position_x ?? 50),
+        foto_position_y: Number(response.data?.foto_position_y ?? prev.foto_position_y ?? 50),
+      }));
+      alert("Foto profil berhasil diperbarui");
+    } catch (error) {
+      alert(
+        error?.response?.data?.errors?.foto?.[0] ||
+          error?.response?.data?.message ||
+          "Gagal upload foto"
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resolvePhotoUrl = (photoUrl) => {
+    if (!photoUrl) return "";
+    if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
+    return `${apiBaseUrl}${photoUrl.startsWith("/") ? "" : "/"}${photoUrl}`;
+  };
+
   return (
-    <div className="md:w-1/3 w-full p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+    <div className="w-full p-6 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
       <h3 className="text-xl font-semibold mb-4 text-center text-gray-700">
         Data Profil
       </h3>
@@ -35,8 +122,9 @@ export default function Profil({ initialUser }) {
       <div className="flex flex-col items-center gap-4">
         <div className="relative w-36 h-36 md:w-44 md:h-44">
           <img
-            src={user.foto}
+            src={resolvePhotoUrl(user.foto)}
             className="w-full h-full object-cover rounded-full ring-4 ring-blue-100 shadow"
+            style={{ objectPosition: `${user?.foto_position_x ?? 50}% ${user?.foto_position_y ?? 50}%` }}
           />
           <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 rounded-full transition-opacity cursor-pointer">
             <label
@@ -51,6 +139,7 @@ export default function Profil({ initialUser }) {
             id="fotoUpload"
             accept="image/*"
             className="hidden"
+            disabled={uploading}
             onChange={handleFotoChange}
           />
         </div>
@@ -62,11 +151,12 @@ export default function Profil({ initialUser }) {
         {[
           { label: "NIP", field: "nip" },
           { label: "Nama", field: "nama" },
+          { label: "No WhatsApp", field: "no_wa" },
           { label: "Pangkat/Golongan", field: "pangkat" },
           { label: "Jabatan", field: "jabatan" },
           { label: "Bagian", field: "bagian" },
           { label: "Unit Kerja", field: "unit" },
-          { label: "Tipe", field: "tipe" },
+          { label: "Tipe Pengguna", field: "status_pengguna" },
           { label: "Email", field: "email" },
           { label: "Status", field: "status" },
         ].map((item) => (
@@ -85,6 +175,17 @@ export default function Profil({ initialUser }) {
                 >
                   {user.status}
                 </p>
+              ) : item.field === "status_pengguna" ? (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`inline-block px-3 py-1 rounded-full font-semibold text-white text-sm ${
+                    user.status_pengguna === "User" ? "bg-blue-500" :
+                    user.status_pengguna === "Admin" ? "bg-red-500" :
+                    user.status_pengguna === "Psikolog" ? "bg-green-500" :
+                    "bg-gray-500"
+                  }`}>
+                    {user.status_pengguna}
+                  </span>
+                </div>
               ) : editField[item.field] ? (
                 <input
                   type="text"
@@ -97,7 +198,7 @@ export default function Profil({ initialUser }) {
               )}
             </div>
 
-            {item.field !== "status" && (
+            {item.field !== "status" && item.field !== "status_pengguna" && (
               <button
                 onClick={() => toggleEdit(item.field)}
                 className="text-gray-400 hover:text-blue-600 transition"
@@ -112,9 +213,10 @@ export default function Profil({ initialUser }) {
       <div className="mt-6 text-center">
         <button
           onClick={handleSave}
+          disabled={saving}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-semibold shadow transition"
         >
-          Simpan Perubahan
+          {saving ? "Menyimpan..." : "Simpan Perubahan"}
         </button>
       </div>
     </div>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import api from "../lib/axios";
 
 export default function Header() {
   const location = useLocation();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [scrollHidden, setScrollHidden] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // === HIDE HEADER ON SCROLL ===
   useEffect(() => {
@@ -17,6 +19,41 @@ export default function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        if (!token) {
+          setCurrentUser(null);
+          return;
+        }
+
+        const response = await api.get("/api/user");
+        const userData = response?.data?.user || response?.data;
+        setCurrentUser(userData || null);
+      } catch (error) {
+        setCurrentUser(null);
+        localStorage.removeItem("auth_token");
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  const dashboardPath =
+    currentUser?.status_pengguna === "Admin" ? "/admin/dashboard" : "/dashboard";
+
+  const handleLogout = async () => {
+    try {
+      await api.post("/api/logout");
+    } catch (error) {
+    } finally {
+      localStorage.removeItem("auth_token");
+      delete api.defaults.headers.common["Authorization"];
+      window.location.href = "/login";
+    }
+  };
 
   const closeMobileMenu = () => {
     setShowMobileMenu(false);
@@ -57,7 +94,7 @@ export default function Header() {
           <nav className="hidden md:flex space-x-10 font-medium text-[15px] items-center">
             <a href="/" className="text-gray-700 hover:text-blue-600 transition">Beranda</a>
             
-            <a href="https://konsultasi.klinikpatnal.com/" className="text-gray-700 hover:text-blue-600 transition">Konsultasi</a>
+            <a href="/consultation" className="text-gray-700 hover:text-blue-600 transition">Konsultasi</a>
 
             {/* Sekarang Media Informasi langsung berupa Link (bukan Button Dropdown) */}
             <a 
@@ -68,6 +105,15 @@ export default function Header() {
             </a>
 
             <a href="/tentang" className="text-gray-700 hover:text-blue-600 transition">Tentang Kami</a>
+
+            {currentUser ? (
+              <>
+                <a href={dashboardPath} className="text-gray-700 hover:text-blue-600 transition">{currentUser.name}</a>
+                <button onClick={handleLogout} className="text-red-600 hover:text-red-700 transition">Logout</button>
+              </>
+            ) : (
+              <a href="/login" className="text-gray-700 hover:text-blue-600 transition">Login</a>
+            )}
           </nav>
         </div>
       </header>
@@ -84,7 +130,7 @@ export default function Header() {
 
         <nav className="flex flex-col py-4">
           <a href="/" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Beranda</a>
-          <a href="https://konsultasi.klinikpatnal.com/" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Konsultasi</a>
+          <a href="/consultation" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Konsultasi</a>
           
           <a 
             href={location.pathname === "/" ? "#pustakadokumen" : "/#pustakadokumen"} 
@@ -95,6 +141,23 @@ export default function Header() {
           </a>
 
           <a href="/tentang" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Tentang Kami</a>
+
+          {currentUser ? (
+            <>
+              <a href={dashboardPath} className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>{currentUser.name}</a>
+              <button
+                onClick={() => {
+                  closeMobileMenu();
+                  handleLogout();
+                }}
+                className="px-6 py-4 text-left text-red-600 hover:bg-red-50 font-medium border-b border-gray-50"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <a href="/login" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Login</a>
+          )}
         </nav>
       </div>
 
