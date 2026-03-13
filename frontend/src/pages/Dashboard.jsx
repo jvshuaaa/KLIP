@@ -13,7 +13,7 @@ export default function Dashboard() {
   const registeredName = (user?.name || user?.nama || "").trim() || "Teman";
 
   useEffect(() => {
-    document.title = "Klinik Patnal - Dashboard";
+    document.title = "Patnal Integrity Hub- Dashboard";
     fetchUser();
   }, []);
 
