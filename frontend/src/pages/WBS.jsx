@@ -12,7 +12,7 @@ export default function WBS() {
   useEffect(() => {
     let mounted = true;
     api
-      .get('/api/ping')
+      .get('/ping')
       .then(() => mounted && setServerStatus('online'))
       .catch(() => mounted && setServerStatus('offline'));
     return () => {

@@ -16,11 +16,12 @@ export default function Login() {
     setError(null);
     setLoading(true);
     const identifier = nip.trim();
-    const userPassword = password;
+    const userPassword = password.trim();
+    console.log('Login request data:', { nip: identifier, password: userPassword });
     try {
       // POST to login route (returns bearer token)
       // No CSRF token needed for Sanctum bearer token auth
-      const response = await api.post('/api/login', { nip: identifier, password: userPassword });
+      const response = await api.post('/login', { nip: identifier, password: userPassword });
 
       // Store the token
       const token = response.data.access_token;
@@ -30,13 +31,23 @@ export default function Login() {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
       // Re-fetch current user to avoid stale profile data from any cached response.
-      const meResponse = await api.get('/api/user');
+      const meResponse = await api.get('/user');
       const currentUser = meResponse?.data?.user || meResponse?.data;
 
       // On success redirect based on user role
-      const role = currentUser?.status_pengguna || response?.data?.user?.status_pengguna;
-      localStorage.setItem('auth_user_role', role || 'User');
-      if (role === 'Admin') {
+      const role = currentUser?.status_pengguna || currentUser?.daftar_sebagai || response?.data?.user?.status_pengguna || response?.data?.user?.daftar_sebagai;
+      
+      // Normalize role to consistent format - preserve actual role
+      const normalizedRole = role ? 
+        (role.toLowerCase() === 'admin' ? 'Admin' : 
+         role.toLowerCase() === 'psikolog' ? 'Psikolog' : 
+         role.toLowerCase() === 'asisten psikolog' ? 'Asisten Psikolog' : 
+         'User') : 'User';
+      
+      localStorage.setItem('auth_user_role', normalizedRole);
+      localStorage.setItem('auth_user_data', JSON.stringify(currentUser || response?.data?.user));
+      
+      if (normalizedRole === 'Admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });

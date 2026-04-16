@@ -26,7 +26,7 @@ export default function UpdatePassword() {
 
   const fetchUser = async () => {
     try {
-      const response = await api.get('/api/user');
+      const response = await api.get('/user');
       setUser(response.data);
     } catch (err) {
       console.error('Failed to fetch user:', err);
@@ -58,7 +58,7 @@ export default function UpdatePassword() {
 
     try {
       setUpdating(true);
-      await api.post('/api/update-password', {
+      await api.post('/update-password', {
         current_password: formData.current_password,
         password: formData.new_password,
         password_confirmation: formData.new_password_confirmation,
@@ -79,7 +79,7 @@ export default function UpdatePassword() {
 
   const handleLogout = async () => {
     try {
-      await api.post('/api/logout');
+      await api.post('/logout');
       navigate('/');
     } catch (err) {
       console.error('Logout failed:', err);

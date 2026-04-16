@@ -10,7 +10,7 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError(null);
     try {
-      const res = await api.post('/api/forgot-password', { email });
+      const res = await api.post('/forgot-password', { email });
       setStatus(res.data.status);
     } catch (err) {
       console.error('forgot password error', err);

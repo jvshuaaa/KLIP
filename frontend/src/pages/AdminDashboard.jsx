@@ -1,8 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../lib/axios";
-import UserDropdownMenu from "../components/UserDropdownMenu";
-import { UPT_BY_PROVINCE, UPT_PROVINCES } from "../lib/uptOptions";
 import {
   LayoutDashboard,
   FileBarChart2,
@@ -16,7 +13,10 @@ import {
   LayoutGrid,
   Sparkles,
   RefreshCw,
+  Star,
+  TrendingUp,
 } from "lucide-react";
+import api from "../services/api";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -27,65 +27,49 @@ export default function AdminDashboard() {
     no_wa: "",
     pangkat_golongan: "",
     jabatan: "",
-    bagian: "",
-    daftar_sebagai: "",
+    unit_kerja: "",
+    eselon: "",
+    instansi: "",
+    daftar_sebagai: "User",
     organization_detail: "",
-    status_pengguna: "User",
     password: "",
     password_confirmation: "",
   };
 
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
   const [view, setView] = useState("menu");
-  const [consultations, setConsultations] = useState([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [userForm, setUserForm] = useState(emptyUserForm);
   const [users, setUsers] = useState([]);
-  const [chatStats, setChatStats] = useState(null);
-  const [userSearchTerm, setUserSearchTerm] = useState("");
-  const [usersCurrentPage, setUsersCurrentPage] = useState(1);
-  const [userFormOpen, setUserFormOpen] = useState(false);
-  const [editingUserId, setEditingUserId] = useState(null);
   const [userSubmitting, setUserSubmitting] = useState(false);
   const [userError, setUserError] = useState("");
-  const [userForm, setUserForm] = useState(emptyUserForm);
-  const [userUptProvince, setUserUptProvince] = useState("");
-
-  // Document management state
-  const emptyDocForm = {
-    title: "", category: "peraturan", sub_category: "",
-    cover: "", file: "", description: "", type: "pdf", video_url: "",
-  };
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [consultations, setConsultations] = useState([]);
   const [documents, setDocuments] = useState([]);
-  const [docLoading, setDocLoading] = useState(false);
-  const [docFormOpen, setDocFormOpen] = useState(false);
-  const [editingDocId, setEditingDocId] = useState(null);
-  const [docForm, setDocForm] = useState(emptyDocForm);
+  const [docForm, setDocForm] = useState({ title: "", category: "", sub_category: "", type: "pdf", url: "" });
   const [docSubmitting, setDocSubmitting] = useState(false);
   const [docError, setDocError] = useState("");
   const [docSearchTerm, setDocSearchTerm] = useState("");
-  // File upload states for documents
-  const [docUploadFile, setDocUploadFile]   = useState(null);
-  const [docCoverFile, setDocCoverFile]     = useState(null);
-
-  // Banner management state
-  const [banners, setBanners]               = useState([]);
-  const [bannerLoading, setBannerLoading]   = useState(false);
-  const [bannerFormOpen, setBannerFormOpen] = useState(false);
-  const [editingBannerId, setEditingBannerId] = useState(null);
-  const [bannerForm, setBannerForm]         = useState({ title: "", subtitle: "", order: 0, is_active: true });
-  const [bannerFile, setBannerFile]         = useState(null);
+  const [docUploadFile, setDocUploadFile] = useState(null);
+  const [editingDocId, setEditingDocId] = useState(null);
+  const [docFormOpen, setDocFormOpen] = useState(false);
+  const [registeredName, setRegisteredName] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
+  const [banners, setBanners] = useState([]);
+  const [bannerForm, setBannerForm] = useState({ title: "", subtitle: "", order: 0, is_active: true });
+  const [bannerFile, setBannerFile] = useState(null);
   const [bannerSubmitting, setBannerSubmitting] = useState(false);
-  const [bannerError, setBannerError]       = useState("");
-
-  // Site images state
-  const [siteImages, setSiteImages]         = useState({ konsultasi_image: null, produk_image: null });
+  const [bannerError, setBannerError] = useState("");
+  const [siteImages, setSiteImages] = useState({ konsultasi_image: null, produk_image: null });
   const [siteImageUploading, setSiteImageUploading] = useState({});
   const [siteImageError, setSiteImageError] = useState("");
+  const [produkImages, setProdukImages] = useState({ produk_image_1: null, produk_image_2: null, produk_image_3: null, produk_image_4: null });
+  const [produkImageUploading, setProdukImageUploading] = useState({});
+  const [produkImageError, setProdukImageError] = useState("");
+  const [produkImageFiles, setProdukImageFiles] = useState({});
 
   useEffect(() => {
     document.title = "Dashboard - KLIP";
-    // Blokir tombol Back browser agar tidak keluar dari dashboard
     window.history.pushState(null, document.title, window.location.href);
     const handlePopState = () => {
       window.history.pushState(null, document.title, window.location.href);
@@ -95,260 +79,14 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const isAdminUser = useCallback((userData) => {
-    const role = (userData?.status_pengguna || "").toLowerCase();
-    const legacyRole = (userData?.daftar_sebagai || "").toLowerCase();
-    return role === "admin" || legacyRole === "admin";
-  }, []);
-
-  const fetchAdminData = useCallback(async () => {
-    try {
-      setDataLoading(true);
-      const [consultationsRes, usersRes, chatStatsRes] = await Promise.allSettled([
-        api.get("/api/consultations"),
-        api.get("/api/admin/users"),
-        api.get("/api/chat/stats"),
-      ]);
-      setConsultations(
-        consultationsRes.status === "fulfilled" ? consultationsRes.value.data : []
-      );
-      setUsers(
-        usersRes.status === "fulfilled" ? usersRes.value.data : []
-      );
-      setChatStats(
-        chatStatsRes.status === "fulfilled" ? chatStatsRes.value.data : null
-      );
-    } catch (error) {
-      console.error("Error loading admin data:", error);
-    } finally {
-      setDataLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user || !isAdminUser(user)) return undefined;
-
-    const intervalId = setInterval(() => {
-      fetchAdminData();
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [user, isAdminUser, fetchAdminData]);
-
-  const fetchDocuments = async () => {
-    try {
-      setDocLoading(true);
-      const res = await api.get("/api/documents");
-      const payload = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.data) ? res.data.data : [];
-      setDocuments(payload);
-    } catch (err) {
-      console.error("Error loading documents:", err);
-    } finally {
-      setDocLoading(false);
-    }
-  };
-
-  const docCategoryOptions = {
-    peraturan: [
-      { id: "uud", label: "UUD 1945" },
-      { id: "tap-mpr", label: "TAP MPR" },
-      { id: "uu-perppu", label: "UU / Perppu" },
-      { id: "pp", label: "Peraturan Pemerintah (PP)" },
-      { id: "perpres", label: "Peraturan Presiden (Perpres)" },
-      { id: "permen", label: "Peraturan Menteri (Permen)" },
-    ],
-    ebook: [
-      { id: "sop", label: "SOP" },
-      { id: "panduan", label: "Panduan & Petunjuk" },
-      { id: "modul", label: "Modul Pembelajaran" },
-      { id: "lainnya", label: "Lainnya" },
-    ],
-    edukasi: [
-      { id: "video-training", label: "Video Training" },
-      { id: "video-tutorial", label: "Video Tutorial" },
-      { id: "webinar", label: "Webinar" },
-      { id: "lainnya", label: "Lainnya" },
-    ],
-  };
-
-  const openAddDoc = () => {
-    setDocForm(emptyDocForm);
-    setEditingDocId(null);
-    setDocError("");
-    setDocUploadFile(null);
-    setDocCoverFile(null);
-    setDocFormOpen(true);
-  };
-
-  const openEditDoc = (doc) => {
-    setDocForm({
-      title: doc.title || "",
-      category: doc.category || "peraturan",
-      sub_category: doc.sub_category || "",
-      cover: doc.cover || "",
-      file: doc.file || "",
-      description: doc.description || "",
-      type: doc.type || "pdf",
-      video_url: doc.video_url || "",
-    });
-    setEditingDocId(doc.id);
-    setDocError("");
-    setDocUploadFile(null);
-    setDocCoverFile(null);
-    setDocFormOpen(true);
-  };
-
-  const handleDocFormChange = (e) => {
-    const { name, value } = e.target;
-    setDocForm((prev) => {
-      const updated = { ...prev, [name]: value };
-      if (name === "category") updated.sub_category = "";
-      return updated;
-    });
-  };
-
-  const handleDocSubmit = async (e) => {
-    e.preventDefault();
-    setDocError("");
-    if (!docForm.title.trim()) { setDocError("Judul harus diisi"); return; }
-    if (!docForm.sub_category) { setDocError("Sub kategori harus dipilih"); return; }
-    if ((docForm.type === "pdf" || docForm.type === "ebook") && !docForm.file && !docUploadFile) { setDocError("File atau URL File harus diisi"); return; }
-    if (docForm.type === "video" && !docForm.video_url) { setDocError("URL Video harus diisi"); return; }
-    setDocSubmitting(true);
-    try {
-      const useFormData = docUploadFile || docCoverFile;
-      if (useFormData) {
-        const fd = new FormData();
-        Object.entries(docForm).forEach(([k, v]) => { if (k !== "file" && k !== "cover" && v !== "") fd.append(k, v); });
-        if (docUploadFile) fd.append("file", docUploadFile);
-        else if (docForm.file) fd.append("file", docForm.file);
-        if (docCoverFile) fd.append("cover", docCoverFile);
-        else if (docForm.cover) fd.append("cover", docForm.cover);
-        if (editingDocId) {
-          await api.post(`/api/documents/${editingDocId}?_method=PUT`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-        } else {
-          await api.post("/api/documents", fd, { headers: { "Content-Type": "multipart/form-data" } });
-        }
-      } else {
-        if (editingDocId) {
-          await api.put(`/api/documents/${editingDocId}`, docForm);
-        } else {
-          await api.post("/api/documents", docForm);
-        }
-      }
-      setDocFormOpen(false);
-      setDocForm(emptyDocForm);
-      setDocUploadFile(null);
-      setDocCoverFile(null);
-      setEditingDocId(null);
-      fetchDocuments();
-    } catch (err) {
-      setDocError(err.response?.data?.message || err.response?.data?.error || "Gagal menyimpan dokumen");
-    } finally {
-      setDocSubmitting(false);
-    }
-  };
-
-  const handleDeleteDoc = async (id) => {
-    if (!window.confirm("Hapus dokumen ini?")) return;
-    try {
-      await api.delete(`/api/documents/${id}`);
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
-    } catch (err) {
-      alert(err.response?.data?.error || "Gagal menghapus dokumen");
-    }
-  };
-
-  // ── Banner management ──────────────────────────────────────
-  const fetchBanners = async () => {
-    try {
-      setBannerLoading(true);
-      const res = await api.get("/api/admin/banners");
-      setBanners(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Failed to load banners:", err);
-    } finally {
-      setBannerLoading(false);
-    }
-  };
-
-  const openAddBanner = () => {
-    setBannerForm({ title: "", subtitle: "", order: (banners.length), is_active: true });
-    setBannerFile(null);
-    setEditingBannerId(null);
-    setBannerError("");
-    setBannerFormOpen(true);
-  };
-
-  const openEditBanner = (b) => {
-    setBannerForm({ title: b.title || "", subtitle: b.subtitle || "", order: b.order ?? 0, is_active: b.is_active !== false });
-    setBannerFile(null);
-    setEditingBannerId(b.id);
-    setBannerError("");
-    setBannerFormOpen(true);
-  };
-
-  const handleBannerSubmit = async (e) => {
-    e.preventDefault();
-    setBannerError("");
-    if (!editingBannerId && !bannerFile) { setBannerError("Gambar banner wajib dipilih."); return; }
-    setBannerSubmitting(true);
-    try {
-      const fd = new FormData();
-      if (bannerFile) fd.append("image", bannerFile);
-      fd.append("title", bannerForm.title);
-      fd.append("subtitle", bannerForm.subtitle);
-      fd.append("order", bannerForm.order);
-      fd.append("is_active", bannerForm.is_active ? "true" : "false");
-      if (editingBannerId) {
-        await api.post(`/api/admin/banners/${editingBannerId}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        await api.post("/api/admin/banners", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      }
-      setBannerFormOpen(false);
-      setBannerFile(null);
-      fetchBanners();
-    } catch (err) {
-      setBannerError(err.response?.data?.message || err.response?.data?.error || "Gagal menyimpan banner.");
-    } finally {
-      setBannerSubmitting(false);
-    }
-  };
-
-  const handleDeleteBanner = async (id) => {
-    if (!window.confirm("Hapus banner ini?")) return;
-    try {
-      await api.delete(`/api/admin/banners/${id}`);
-      setBanners((prev) => prev.filter((b) => b.id !== id));
-    } catch (err) {
-      alert(err.response?.data?.error || "Gagal menghapus banner.");
-    }
-  };
-
-  // ── Site images ────────────────────────────────────────────
-  const fetchSiteImages = async () => {
-    try {
-      const res = await api.get("/api/site-settings");
-      setSiteImages(res.data || {});
-    } catch (err) {
-      console.error("Failed to load site settings:", err);
-    }
-  };
-
-  const handleSiteImageUpload = async (key, file) => {
-    if (!file) return;
-    setSiteImageUploading((prev) => ({ ...prev, [key]: true }));
-    setSiteImageError("");
-    try {
-      const fd = new FormData();
-      fd.append("image", file);
-      const res = await api.post(`/api/admin/site-settings/${key}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setSiteImages((prev) => ({ ...prev, [key]: res.data?.data?.url }));
-    } catch (err) {
-      setSiteImageError(err.response?.data?.message || err.response?.data?.error || "Gagal mengupload gambar.");
-    } finally {
-      setSiteImageUploading((prev) => ({ ...prev, [key]: false }));
-    }
+  const handleViewChange = (newView) => {
+    if (isTransitioning || newView === view) return;
+    
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setView(newView);
+      setIsTransitioning(false);
+    }, 100);
   };
 
   const checkAdmin = async () => {
@@ -359,1367 +97,1305 @@ export default function AdminDashboard() {
         return;
       }
 
-      const response = await api.get("/api/user");
+      const response = await api.get("/user");
       const userData = response?.data?.user || response?.data;
-
-      if (!isAdminUser(userData)) {
-        navigate("/dashboard", { replace: true });
+      
+      if (!userData) {
+        navigate("/login");
         return;
       }
 
-      setUser(userData);
-      await fetchAdminData();
-    } catch (error) {
-      console.error("Error checking admin:", error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        navigate("/login");
-      } else {
-        navigate("/");
+      // Check admin role using consistent logic with login
+      const role = userData?.status_pengguna || userData?.daftar_sebagai;
+      const normalizedRole = role ? (role.toLowerCase() === 'admin' ? 'Admin' : 'User') : 'User';
+      
+      if (normalizedRole !== 'Admin') {
+        navigate("/dashboard");
+        return;
       }
-    } finally {
-      setAuthLoading(false);
+
+      setRegisteredName(userData.name || "Admin");
+      fetchAdminData();
+    } catch (error) {
+      console.error("Admin check error:", error);
+      navigate("/login");
     }
   };
 
-  const handleLogout = async () => {
+  const fetchAdminData = async () => {
+    setDataLoading(true);
     try {
-      await api.post("/api/logout");
-      localStorage.removeItem("auth_token");
-      delete api.defaults.headers.common["Authorization"];
-      navigate("/");
-    } catch (err) {
-      console.error("Logout failed:", err);
-      localStorage.removeItem("auth_token");
-      delete api.defaults.headers.common["Authorization"];
-      navigate("/");
+      const [usersRes, consultationsRes, documentsRes, bannersRes, siteImagesRes] = await Promise.all([
+        api.get("/admin/users"),
+        api.get("/admin/consultations"),
+        api.get("/admin/documents"),
+        api.get("/admin/banners"),
+        api.get("/site-settings")
+      ]);
+
+      setUsers(usersRes.data?.users || []);
+      setConsultations(consultationsRes.data?.consultations || []);
+      setDocuments(documentsRes.data?.documents || []);
+      setBanners(bannersRes.data?.banners || []);
+      
+      const siteData = siteImagesRes.data || {};
+      setSiteImages({
+        konsultasi_image: siteData.konsultasi_image || null,
+        produk_image: siteData.produk_image || null
+      });
+      
+      setProdukImages({
+        produk_image_1: siteData.produk_image_1 || null,
+        produk_image_2: siteData.produk_image_2 || null,
+        produk_image_3: siteData.produk_image_3 || null,
+        produk_image_4: siteData.produk_image_4 || null
+      });
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+    } finally {
+      setDataLoading(false);
     }
-  };
-
-  const resetUserForm = () => {
-    setUserForm(emptyUserForm);
-    setEditingUserId(null);
-    setUserError("");
-    setUserUptProvince("");
-  };
-
-  const openCreateUserForm = () => {
-    resetUserForm();
-    setUserFormOpen(true);
-  };
-
-  const openEditUserForm = (selectedUser) => {
-    setEditingUserId(selectedUser.id);
-    setUserForm({
-      name: selectedUser.name || "",
-      nip: selectedUser.nip || "",
-      email: selectedUser.email || "",
-      no_wa: selectedUser.no_wa || "",
-      pangkat_golongan: selectedUser.pangkat_golongan || "",
-      jabatan: selectedUser.jabatan || "",
-      bagian: selectedUser.bagian || "",
-      daftar_sebagai: selectedUser.daftar_sebagai || "",
-      organization_detail: selectedUser.organization_detail || "",
-      status_pengguna: selectedUser.status_pengguna || "User",
-      password: "",
-      password_confirmation: "",
-    });
-    // Restore UPT province from organization_detail format "Province - UPT"
-    if (selectedUser.daftar_sebagai === "UPT" && selectedUser.organization_detail) {
-      const parts = selectedUser.organization_detail.split(" - ");
-      setUserUptProvince(parts[0] || "");
-    } else {
-      setUserUptProvince("");
-    }
-    setUserError("");
-    setUserFormOpen(true);
   };
 
   const handleUserFormChange = (e) => {
     const { name, value } = e.target;
-    if (name === "daftar_sebagai") {
-      setUserForm((prev) => ({ ...prev, daftar_sebagai: value, organization_detail: "" }));
-      setUserUptProvince("");
-      return;
-    }
-    setUserForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleUserUptProvinceChange = (e) => {
-    setUserUptProvince(e.target.value);
-    setUserForm((prev) => ({ ...prev, organization_detail: "" }));
-  };
-
-  const handleUserUptDetailChange = (e) => {
-    const uptName = e.target.value;
-    setUserForm((prev) => ({
-      ...prev,
-      organization_detail: uptName ? `${userUptProvince} - ${uptName}` : "",
-    }));
+    setUserForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleUserSubmit = async (e) => {
     e.preventDefault();
+    setUserSubmitting(true);
     setUserError("");
 
-    if (!editingUserId && !userForm.password) {
-      setUserError("Password wajib diisi saat menambah user.");
-      return;
-    }
-
-    if (userForm.password && userForm.password !== userForm.password_confirmation) {
-      setUserError("Konfirmasi password tidak cocok.");
-      return;
-    }
-
     try {
-      setUserSubmitting(true);
-
-      const payload = {
-        name: userForm.name,
-        nip: userForm.nip,
-        email: userForm.email,
-        no_wa: userForm.no_wa,
-        pangkat_golongan: userForm.pangkat_golongan,
-        jabatan: userForm.jabatan,
-        bagian: userForm.bagian,
-        daftar_sebagai: userForm.daftar_sebagai,
-        organization_detail: userForm.organization_detail,
-        status_pengguna: userForm.status_pengguna,
-      };
-
-      if (userForm.password) {
-        payload.password = userForm.password;
-        payload.password_confirmation = userForm.password_confirmation;
-      }
-
       if (editingUserId) {
-        await api.put(`/api/admin/users/${editingUserId}`, payload);
+        await api.put(`/admin/users/${editingUserId}`, userForm);
       } else {
-        await api.post("/api/admin/users", payload);
+        await api.post("/admin/users", userForm);
       }
-
-      setUserFormOpen(false);
-      resetUserForm();
+      
       await fetchAdminData();
-      setView("users");
+      resetUserForm();
+      setUserFormOpen(false);
+      setEditingUserId(null);
     } catch (error) {
-      setUserError(
-        error?.response?.data?.message ||
-        error?.response?.data?.errors?.email?.[0] ||
-        error?.response?.data?.errors?.nip?.[0] ||
-        "Gagal menyimpan data user"
-      );
+      setUserError(error.response?.data?.message || "Gagal menyimpan user");
     } finally {
       setUserSubmitting(false);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Yakin ingin menghapus user ini?")) return;
+  const resetUserForm = () => {
+    setUserForm(emptyUserForm);
+    setUserError("");
+  };
 
+  const openEditUser = (user) => {
+    setUserForm({
+      name: user.name || "",
+      nip: user.nip || "",
+      email: user.email || "",
+      no_wa: user.no_wa || "",
+      pangkat_golongan: user.pangkat_golongan || "",
+      jabatan: user.jabatan || "",
+      unit_kerja: user.unit_kerja || "",
+      eselon: user.eselon || "",
+      instansi: user.instansi || "",
+      daftar_sebagai: user.daftar_sebagai || "User",
+      organization_detail: user.organization_detail || "",
+      password: "",
+      password_confirmation: "",
+    });
+    setEditingUserId(user.id);
+    setUserFormOpen(true);
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!confirm("Yakin ingin menghapus user ini?")) return;
+    
     try {
-      await api.delete(`/api/admin/users/${userId}`);
+      await api.delete(`/admin/users/${userId}`);
       await fetchAdminData();
     } catch (error) {
-      alert(error?.response?.data?.message || "Gagal menghapus user");
+      alert("Gagal menghapus user");
     }
   };
 
-  const consultationStats = useMemo(() => {
-    return {
-      pending: consultations.filter((item) => item.status === "pending").length,
-      inProgress: consultations.filter((item) => item.status === "in_progress" || item.status === "reviewed").length,
-      needsReferral: consultations.filter((item) => item.status === "needs_referral").length,
-      completed: consultations.filter((item) => item.status === "completed").length,
-    };
-  }, [consultations]);
+  const handleDocFormChange = (e) => {
+    const { name, value } = e.target;
+    setDocForm(prev => ({ ...prev, [name]: value }));
+  };
 
-  const onlineUsersCount = useMemo(() => {
-    return users.filter((item) => item.is_online).length;
-  }, [users]);
+  const handleDocSubmit = async (e) => {
+    e.preventDefault();
+    setDocSubmitting(true);
+    setDocError("");
 
+    try {
+      const formData = new FormData();
+      if (docUploadFile) {
+        formData.append("file", docUploadFile);
+      } else {
+        formData.append("url", docForm.url);
+      }
+      formData.append("title", docForm.title);
+      formData.append("category", docForm.category);
+      formData.append("sub_category", docForm.sub_category);
+      formData.append("type", docForm.type);
 
-  const USERS_PER_PAGE = 10;
-
-  const filteredUsers = useMemo(() => {
-    const keyword = userSearchTerm.trim().toLowerCase();
-    if (!keyword) return users;
-
-    return users.filter((item) => {
-      const combined = [
-        item.name,
-        item.nip,
-        item.email,
-        item.status_pengguna,
-        item.daftar_sebagai,
-        item.organization_detail,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return combined.includes(keyword);
-    });
-  }, [users, userSearchTerm]);
-
-  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
-
-  const paginatedUsers = useMemo(() => {
-    const start = (usersCurrentPage - 1) * USERS_PER_PAGE;
-    return filteredUsers.slice(start, start + USERS_PER_PAGE);
-  }, [filteredUsers, usersCurrentPage]);
-
-  useEffect(() => {
-    setUsersCurrentPage(1);
-  }, [userSearchTerm, users.length]);
-
-  const registeredName = (user?.name || user?.nama || "").trim() || "Teman";
-
-  // Trigger fetchAdminData after login/logout to refresh user statuses
-  useEffect(() => {
-    const handleStatusUpdate = async () => {
+      if (editingDocId) {
+        await api.post(`/admin/documents/${editingDocId}`, formData);
+      } else {
+        await api.post("/admin/documents", formData);
+      }
+      
       await fetchAdminData();
-    };
+      resetDocForm();
+      setDocFormOpen(false);
+      setEditingDocId(null);
+    } catch (error) {
+      setDocError(error.response?.data?.message || "Gagal menyimpan dokumen");
+    } finally {
+      setDocSubmitting(false);
+    }
+  };
 
-    window.addEventListener("userStatusUpdate", handleStatusUpdate);
+  const resetDocForm = () => {
+    setDocForm({ title: "", category: "", sub_category: "", type: "pdf", url: "" });
+    setDocUploadFile(null);
+    setDocError("");
+  };
 
-    return () => {
-      window.removeEventListener("userStatusUpdate", handleStatusUpdate);
-    };
-  }, [fetchAdminData]);
+  const openEditDoc = (doc) => {
+    setDocForm({
+      title: doc.title || "",
+      category: doc.category || "",
+      sub_category: doc.sub_category || "",
+      type: doc.type || "pdf",
+      url: doc.url || ""
+    });
+    setEditingDocId(doc.id);
+    setDocFormOpen(true);
+  };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Memuat dashboard admin...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteDoc = async (docId) => {
+    if (!confirm("Yakin ingin menghapus dokumen ini?")) return;
+    
+    try {
+      await api.delete(`/admin/documents/${docId}`);
+      await fetchAdminData();
+    } catch (error) {
+      alert("Gagal menghapus dokumen");
+    }
+  };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-xl shadow-md p-6 text-center text-gray-600 max-w-xl w-full">
-          Data admin tidak ditemukan atau akses tidak valid.
-        </div>
-      </div>
-    );
-  }
+  const handleBannerSubmit = async (e) => {
+    e.preventDefault();
+    setBannerSubmitting(true);
+    setBannerError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("title", bannerForm.title);
+      formData.append("subtitle", bannerForm.subtitle);
+      formData.append("order", bannerForm.order);
+      formData.append("is_active", bannerForm.is_active);
+      if (bannerFile) {
+        formData.append("image", bannerFile);
+      }
+
+      if (editingBannerId) {
+        await api.post(`/admin/banners/${editingBannerId}`, formData);
+      } else {
+        await api.post("/admin/banners", formData);
+      }
+      
+      await fetchAdminData();
+      resetBannerForm();
+      setBannerFormOpen(false);
+      setEditingBannerId(null);
+    } catch (error) {
+      setBannerError(error.response?.data?.message || "Gagal menyimpan banner");
+    } finally {
+      setBannerSubmitting(false);
+    }
+  };
+
+  const resetBannerForm = () => {
+    setBannerForm({ title: "", subtitle: "", order: 0, is_active: true });
+    setBannerFile(null);
+    setBannerError("");
+  };
+
+  const openEditBanner = (banner) => {
+    setBannerForm({
+      title: banner.title || "",
+      subtitle: banner.subtitle || "",
+      order: banner.order || 0,
+      is_active: banner.is_active !== undefined ? banner.is_active : true
+    });
+    setEditingBannerId(banner.id);
+    setBannerFormOpen(true);
+  };
+
+  const handleDeleteBanner = async (bannerId) => {
+    if (!confirm("Yakin ingin menghapus banner ini?")) return;
+    
+    try {
+      await api.delete(`/admin/banners/${bannerId}`);
+      await fetchAdminData();
+    } catch (error) {
+      alert("Gagal menghapus banner");
+    }
+  };
+
+  const handleSiteImageUpload = async (key, file) => {
+    if (!file) return;
+    setSiteImageUploading((prev) => ({ ...prev, [key]: true }));
+    setSiteImageError("");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await api.post(`/admin/site-settings/${key}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setSiteImages((prev) => ({ ...prev, [key]: res.data?.data?.url }));
+    } catch (err) {
+      setSiteImageError(err.response?.data?.message || err.response?.data?.error || "Gagal mengupload gambar.");
+    } finally {
+      setSiteImageUploading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleProdukImageFileChange = (key, file) => {
+    setProdukImageFiles(prev => ({ ...prev, [key]: file }));
+  };
+
+  const handleProdukImageUpload = async () => {
+    const fd = new FormData();
+    
+    console.log('Files to upload:', produkImageFiles);
+    
+    Object.entries(produkImageFiles).forEach(([key, file]) => {
+      if (file) {
+        fd.append(key, file);
+        console.log(`Appending ${key}:`, file.name, file.size, file.type);
+      }
+    });
+
+    // Check if any files were added
+    const hasFiles = Object.values(produkImageFiles).some(file => file !== null);
+    if (!hasFiles) {
+      setProdukImageError("Pilih setidaknya satu gambar untuk diupload.");
+      return;
+    }
+
+    setProdukImageUploading({ all: true });
+    setProdukImageError("");
+    
+    try {
+      console.log('Sending request to /admin/produk-images');
+      
+      const res = await api.post("/admin/produk-images", fd, { 
+        headers: { "Content-Type": "multipart/form-data" } 
+      });
+      
+      console.log('Upload response:', res.data);
+      
+      setProdukImages(prev => ({ ...prev, ...res.data.updated_images }));
+      setProdukImageFiles({});
+      setProdukImageError("");
+      alert("Gambar produk berhasil diperbarui!");
+    } catch (err) {
+      console.error('Upload error:', err);
+      console.error('Error response:', err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error || 
+                        err.response?.data?.errors?.file?.[0] ||
+                        "Gagal mengupload gambar produk.";
+      
+      setProdukImageError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setProdukImageUploading({ all: false });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <a href="/" className="flex items-center">
-            <img
-              src="/Logo.png"
-              alt="Patnal Integrity Hub"
-              className="h-10 md:h-11 w-auto object-contain"
-            />
-          </a>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full border border-blue-200">
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Admin Panel
-            </span>
-            <UserDropdownMenu user={user} onLogout={handleLogout} />
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-6">
-
-          {/* Sidebar */}
-          <aside className="md:w-64 flex-shrink-0">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 pt-4 pb-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Navigasi</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 bg-white shadow-lg h-screen sticky top-0 border-r border-gray-200">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                <LayoutGrid className="w-6 h-6 text-white" />
               </div>
-              <nav className="pb-2">
-                <a href="/admin/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-blue-700 bg-blue-50 font-semibold border-l-4 border-blue-600 text-sm">
-                  <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
-                  Dashboard
-                </a>
-                <a href="/admin/reports" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
-                  <FileBarChart2 className="w-4 h-4 flex-shrink-0" />
-                  Laporan
-                </a>
-                <div className="mx-4 my-2 border-t border-gray-100" />
-                <a href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-gray-500 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
-                  <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-                  Dashboard Pengguna
-                </a>
-              </nav>
+              <div>
+                <h1 className="font-bold text-gray-800">Admin Panel</h1>
+                <p className="text-xs text-gray-500">Patnal Integrity Hub</p>
+              </div>
             </div>
-          </aside>
+            <nav className="pb-2">
+              <a href="/admin/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-blue-700 bg-blue-50 font-semibold border-l-4 border-blue-600 text-sm">
+                <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+                Dashboard
+              </a>
+              <a href="/admin/reports" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
+                <FileBarChart2 className="w-4 h-4 flex-shrink-0" />
+                Laporan
+              </a>
+              <a href="/admin/survey" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
+                <Star className="w-4 h-4 flex-shrink-0" />
+                Survey Kepuasan
+              </a>
+              <div className="mx-4 my-2 border-t border-gray-100" />
+              <a href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-gray-500 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
+                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+                Dashboard Pengguna
+              </a>
+            </nav>
+          </div>
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 min-w-0 space-y-6">
-            {/* Welcome + Refresh */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 p-5 text-white shadow-lg flex-1">
-                <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
-                <div className="absolute -bottom-6 right-10 w-20 h-20 bg-white/10 rounded-full" />
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4 text-yellow-300" />
-                    <span className="text-xs text-blue-100">
-                      {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                    </span>
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-bold">Halo, {registeredName}! 👋</h2>
-                  <p className="text-blue-100 text-xs mt-1">Pusat data master dan monitoring operasional admin.</p>
+        {/* Main Content */}
+        <main className="flex-1 min-w-0 space-y-6">
+          {/* Welcome + Refresh */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 p-5 text-white shadow-lg flex-1">
+              <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
+              <div className="absolute -bottom-6 right-10 w-20 h-20 bg-white/10 rounded-full" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="w-4 h-4 text-yellow-300" />
+                  <span className="text-xs text-blue-100">
+                    {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  </span>
                 </div>
+                <h2 className="text-xl md:text-2xl font-bold">Halo, {registeredName}! </h2>
+                <p className="text-blue-100 text-xs mt-1">Pusat data master dan monitoring operasional admin.</p>
               </div>
+            </div>
+            <button
+              onClick={fetchAdminData}
+              disabled={dataLoading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm text-sm font-medium transition"
+            >
+              <RefreshCw className={`w-4 h-4 ${dataLoading ? "animate-spin" : ""}`} />
+              {dataLoading ? "Memuat..." : "Refresh"}
+            </button>
+          </div>
+
+          {view === "menu" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {/* Monitoring Konsultasi */}
               <button
-                onClick={fetchAdminData}
-                disabled={dataLoading}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm text-sm font-medium transition"
+                onClick={() => { fetchAdminData(); handleViewChange("consultation"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 p-5 overflow-hidden relative"
               >
-                <RefreshCw className={`w-4 h-4 ${dataLoading ? "animate-spin" : ""}`} />
-                {dataLoading ? "Memuat..." : "Refresh"}
+                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
+                  <ClipboardList className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Monitoring Konsultasi</p>
+                <p className="text-xs text-gray-500 mb-3">Lihat semua sesi konsultasi yang aktif.</p>
+                <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Total: {consultations.length} sesi</span>
+              </button>
+
+              {/* Manajemen User */}
+              <button
+                onClick={() => { fetchAdminData(); handleViewChange("users"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-200 p-5 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-green-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-600 transition-colors">
+                  <Users className="w-5 h-5 text-green-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Manajemen User</p>
+                <p className="text-xs text-gray-500 mb-3">Tambah, edit, dan hapus user.</p>
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Total: {users.length} user</span>
+              </button>
+
+              {/* Manajemen Dokumen */}
+              <button
+                onClick={() => { fetchAdminData(); handleViewChange("documents"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all duration-200 p-5 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-orange-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-600 transition-colors">
+                  <BookOpen className="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Manajemen Dokumen</p>
+                <p className="text-xs text-gray-500 mb-3">Upload dan kelola dokumen PDF.</p>
+                <span className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full font-medium">Total: {documents.length} dokumen</span>
+              </button>
+
+              {/* Survey Kepuasan */}
+              <button
+                onClick={() => { fetchAdminData(); handleViewChange("survey"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 p-5 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
+                  <Star className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Survey Kepuasan</p>
+                <p className="text-xs text-gray-500 mb-3">Lihat hasil dan analisis survey kepuasan pengguna.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Analytics</span>
+                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Export</span>
+                </div>
+              </button>
+
+              
+              {/* Gambar Produk */}
+              <button
+                onClick={() => { fetchAdminData(); handleViewChange("produk_images"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200 p-5 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mb-3 group-hover:bg-indigo-600 transition-colors">
+                  <Image className="w-5 h-5 text-indigo-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Kelola Gambar Produk</p>
+                <p className="text-xs text-gray-500 mb-3">Upload dan atur 4 gambar produk Patnal.</p>
+                <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-medium">4 Images</span>
+              </button>
+
+              {/* Gambar Halaman */}
+              <button
+                onClick={() => { fetchAdminData(); handleViewChange("site_images"); }}
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all duration-200 p-5 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-pink-50 rounded-bl-full opacity-70" />
+                <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center mb-3 group-hover:bg-pink-600 transition-colors">
+                  <Image className="w-5 h-5 text-pink-600 group-hover:text-white transition-colors" />
+                </div>
+                <p className="font-semibold text-gray-800 text-sm mb-1">Kelola Gambar Halaman</p>
+                <p className="text-xs text-gray-500">Ganti gambar ilustrasi pada halaman Beranda.</p>
               </button>
             </div>
+          )}
 
-            {view === "menu" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {/* Monitoring Konsultasi */}
-                  <button
-                    onClick={() => setView("consultation")}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-purple-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-600 transition-colors">
-                      <ClipboardList className="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Monitoring Konsultasi</p>
-                    <p className="text-xs text-gray-500 mb-3">Pantau status konsultasi klien secara menyeluruh.</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full font-medium">Tunggu: {consultationStats.pending}</span>
-                      <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Proses: {consultationStats.inProgress}</span>
-                      <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-medium">Rujukan: {consultationStats.needsReferral}</span>
-                      <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Selesai: {consultationStats.completed}</span>
-                    </div>
-                  </button>
+          {/* VIEWS */}
+          {view === "consultation" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-purple-600" />
+                  Monitoring Konsultasi
+                </h2>
+                <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                  <ArrowLeft className="w-4 h-4" /> Kembali
+                </button>
+              </div>
 
-                  {/* Management Users */}
-                  <button
-                    onClick={() => setView("users")}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-orange-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
-                      <Users className="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" />
+              {consultations.length === 0 ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-600 text-sm">
+                  Belum ada data konsultasi untuk ditampilkan.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {consultations.slice(0, 20).map((item) => (
+                    <div
+                      key={item.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 truncate">{item.user?.name || "Anonymous"}</p>
+                          <p className="text-sm text-gray-500">{item.created_at}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          item.status === "active"
+                            ? "bg-green-100 text-green-700"
+                            : item.status === "ended"
+                            ? "bg-gray-100 text-gray-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {item.status}
+                        </span>
+                      </div>
                     </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Management Users</p>
-                    <p className="text-xs text-gray-500 mb-3">Tambah, ubah, dan hapus data user.</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded-full font-medium">Total: {users.length}</span>
-                      <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Online: {onlineUsersCount}</span>
-                      <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-medium">Offline: {Math.max(users.length - onlineUsersCount, 0)}</span>
-                    </div>
-                  </button>
-
-                  {/* Monitoring Chat */}
-                  <button
-                    onClick={() => setView("chat")}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mb-3 group-hover:bg-indigo-600 transition-colors">
-                      <MessageSquare className="w-5 h-5 text-indigo-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Monitoring Chat</p>
-                    <p className="text-xs text-gray-500 mb-3">Pantau sesi chat aktif per psikolog.</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-medium">Aktif: {chatStats?.active_total ?? "…"}</span>
-                      <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Selesai: {chatStats?.completed_total ?? "…"}</span>
-                    </div>
-                  </button>
-
-                  {/* Laporan */}
-                  <a
-                    href="/admin/reports"
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-teal-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-teal-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center mb-3 group-hover:bg-teal-600 transition-colors">
-                      <FileBarChart2 className="w-5 h-5 text-teal-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Laporan Harian/Bulanan/Tahunan</p>
-                    <p className="text-xs text-gray-500 mb-3">Tren konsultasi dalam berbagai rentang waktu.</p>
-                    <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-medium">Total: {consultations.length}</span>
-                  </a>
-
-                  {/* Pustaka Dokumen */}
-                  <button
-                    onClick={() => { setDocSearchTerm(""); fetchDocuments(); setView("documents"); }}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-green-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-600 transition-colors">
-                      <BookOpen className="w-5 h-5 text-green-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Kelola Pustaka Dokumen</p>
-                    <p className="text-xs text-gray-500 mb-3">Tambah, edit, dan hapus dokumen di pustaka.</p>
-                    <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Total: {documents.length} dokumen</span>
-                  </button>
-
-                  {/* Banner Homepage */}
-                  <button
-                    onClick={() => { fetchBanners(); setView("banners"); }}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-yellow-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center mb-3 group-hover:bg-yellow-500 transition-colors">
-                      <ImagePlay className="w-5 h-5 text-yellow-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Kelola Banner Homepage</p>
-                    <p className="text-xs text-gray-500 mb-3">Upload dan atur gambar banner carousel.</p>
-                    <span className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full font-medium">Total: {banners.length} banner</span>
-                  </button>
-
-                  {/* Gambar Halaman */}
-                  <button
-                    onClick={() => { fetchSiteImages(); setView("site_images"); }}
-                    className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all duration-200 p-5 overflow-hidden relative"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-pink-50 rounded-bl-full opacity-70" />
-                    <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center mb-3 group-hover:bg-pink-600 transition-colors">
-                      <Image className="w-5 h-5 text-pink-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm mb-1">Kelola Gambar Halaman</p>
-                    <p className="text-xs text-gray-500">Ganti gambar ilustrasi pada halaman Beranda.</p>
-                  </button>
+                  ))}
                 </div>
               )}
+            </div>
+          )}
 
-              {view === "consultation" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <ClipboardList className="w-5 h-5 text-purple-600" />
-                      Monitoring Konsultasi
-                    </h2>
-                    <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
-                      <ArrowLeft className="w-4 h-4" /> Kembali
-                    </button>
-                  </div>
+          {view === "users" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-green-600" />
+                  Manajemen User
+                </h2>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { resetUserForm(); setUserFormOpen(true); }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+                  >
+                    + Tambah User
+                  </button>
+                  <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                    <ArrowLeft className="w-4 h-4" /> Kembali
+                  </button>
+                </div>
+              </div>
 
-                  {consultations.length === 0 ? (
-                    <p className="text-sm text-gray-600">Belum ada data konsultasi untuk ditampilkan.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {consultations.slice(0, 20).map((item) => (
-                        <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-gray-800">Konsultasi #{item.id}</p>
-                              <p className="text-xs text-gray-500">Klien: {item.user?.name || "-"}</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              item.status === "completed"
-                                ? "bg-green-100 text-green-800"
-                                : item.status === "in_progress" || item.status === "reviewed"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : item.status === "needs_referral"
-                                    ? "bg-red-100 text-red-800"
-                                  : "bg-yellow-100 text-yellow-800"
+              {users.length === 0 ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-600 text-sm">
+                  Belum ada user terdaftar.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Nama</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">{user.name}</td>
+                          <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              user.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                             }`}>
-                              {item.status === "pending"
-                                ? "Tunggu"
-                                : item.status === "in_progress" || item.status === "reviewed"
-                                  ? "Diproses"
-                                  : item.status === "needs_referral"
-                                    ? "Perlu Rujukan"
-                                    : item.status === "completed"
-                                      ? "Selesai"
-                                      : item.status || "Tunggu"}
+                              {user.role}
                             </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-2 line-clamp-2">{item.q3}</p>
-                        </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              user.status_approval === "approved" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                            }`}>
+                              {user.status_approval || "pending"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => openEditUser(user)}
+                                className="px-3 py-1 text-xs rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="px-3 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              {view === "chat" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-indigo-600" />
-                      Monitoring Chat
-                    </h2>
-                    <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
-                      <ArrowLeft className="w-4 h-4" /> Kembali
+              {/* User Form Modal */}
+              {userFormOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div className="px-6 py-4 border-b border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-800">
+                        {editingUserId ? "Edit User" : "Tambah User Baru"}
+                      </h3>
+                    </div>
+
+                    <form id="user-form" onSubmit={handleUserSubmit} className="px-6 py-4 space-y-4">
+                      {/* Basic Info */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Informasi Dasar</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nama <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              name="name"
+                              value={userForm.name}
+                              onChange={handleUserFormChange}
+                              required
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">NIP <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              name="nip"
+                              value={userForm.nip}
+                              onChange={handleUserFormChange}
+                              required
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+                          <input
+                            type="email"
+                            name="email"
+                            value={userForm.email}
+                            onChange={handleUserFormChange}
+                            required
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">No. WhatsApp</label>
+                          <input
+                            type="text"
+                            name="no_wa"
+                            value={userForm.no_wa}
+                            onChange={handleUserFormChange}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Organization */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Organisasi</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Daftar Sebagai <span className="text-red-500">*</span></label>
+                            <select
+                              name="daftar_sebagai"
+                              value={userForm.daftar_sebagai}
+                              onChange={handleUserFormChange}
+                              required
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            >
+                              <option value="User">User</option>
+                              <option value="Psikolog">Psikolog</option>
+                              <option value="Admin">Admin</option>
+                              <option value="Kanwil">Kanwil</option>
+                              <option value="UPT">UPT</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Role <span className="text-red-500">*</span></label>
+                            <select
+                              name="role"
+                              value={userForm.role}
+                              onChange={handleUserFormChange}
+                              required
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            >
+                              <option value="user">User</option>
+                              <option value="psikolog">Psikolog</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                          Password {editingUserId && <span className="text-gray-400 normal-case font-normal">(kosongkan jika tidak ingin mengubah)</span>}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Password {!editingUserId && <span className="text-red-500">*</span>}
+                            </label>
+                            <input
+                              type="password"
+                              name="password"
+                              value={userForm.password}
+                              onChange={handleUserFormChange}
+                              placeholder="Minimal 8 karakter"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Konfirmasi Password</label>
+                            <input
+                              type="password"
+                              name="password_confirmation"
+                              value={userForm.password_confirmation}
+                              onChange={handleUserFormChange}
+                              placeholder="Ulangi password"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+
+                    {/* Modal Footer */}
+                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
+                      <button
+                        type="button"
+                        onClick={() => { setUserFormOpen(false); resetUserForm(); }}
+                        className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white hover:shadow-sm transition-all"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        form="user-form"
+                        disabled={userSubmitting}
+                        className={`px-5 py-2 rounded-lg text-sm text-white font-medium transition-all disabled:opacity-50 ${
+                          editingUserId ? "bg-blue-600 hover:bg-blue-700" : "bg-orange-500 hover:bg-orange-600"
+                        }`}
+                      >
+                        {userSubmitting ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Menyimpan...
+                          </span>
+                        ) : (
+                          editingUserId ? "Simpan Perubahan" : "Buat Akun"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {view === "documents" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-orange-600" />
+                  Manajemen Dokumen
+                </h2>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { resetDocForm(); setDocFormOpen(true); }}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm font-medium"
+                  >
+                    + Tambah Dokumen
+                  </button>
+                  <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                    <ArrowLeft className="w-4 h-4" /> Kembali
+                  </button>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Cari dokumen..."
+                  value={docSearchTerm}
+                  onChange={(e) => setDocSearchTerm(e.target.value)}
+                  className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+
+              {documents.filter((d) =>
+                d.title?.toLowerCase().includes(docSearchTerm.toLowerCase())
+              ).length === 0 ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-600 text-sm">
+                  Belum ada dokumen
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Judul</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Kategori</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Sub Kategori</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Tipe</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-700">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {documents
+                        .filter((d) =>
+                          d.title?.toLowerCase().includes(docSearchTerm.toLowerCase())
+                        )
+                        .map((doc) => (
+                          <tr key={doc.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-800 max-w-xs truncate">{doc.title}</td>
+                            <td className="px-4 py-3 text-gray-600 capitalize">{doc.category}</td>
+                            <td className="px-4 py-3 text-gray-600">{doc.sub_category}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                doc.type === "video"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : doc.type === "pdf"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}>
+                                {doc.type?.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openEditDoc(doc)}
+                                  className="px-3 py-1 text-xs rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDoc(doc.id)}
+                                  className="px-3 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Document Form Modal */}
+              {docFormOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div className="px-6 py-4 border-b border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-800">
+                        {editingDocId ? "Edit Dokumen" : "Tambah Dokumen Baru"}
+                      </h3>
+                    </div>
+
+                    <form id="doc-form" onSubmit={handleDocSubmit} className="px-6 py-4 space-y-4">
+                      {/* Type Selection */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Tipe Dokumen</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {["pdf", "video", "ebook", "other"].map((type) => (
+                            <label key={type} className="flex items-center">
+                              <input
+                                type="radio"
+                                name="type"
+                                value={type}
+                                checked={docForm.type === type}
+                                onChange={handleDocFormChange}
+                                className="mr-2"
+                              />
+                              <span className="text-sm capitalize">{type}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100" />
+
+                      {/* Category Selection */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Kategori</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Utama <span className="text-red-500">*</span></label>
+                            <select
+                              name="category"
+                              value={docForm.category}
+                              onChange={handleDocFormChange}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              <option value="peraturan">Himpunan Peraturan</option>
+                              <option value="ebook">Standar Operasional</option>
+                              <option value="edukasi">Edukasi</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Sub Kategori <span className="text-red-500">*</span></label>
+                            <select
+                              name="sub_category"
+                              value={docForm.sub_category}
+                              onChange={handleDocFormChange}
+                              required
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              <option value="">-- Pilih Sub Kategori --</option>
+                              <option value="sub1">Sub Kategori 1</option>
+                              <option value="sub2">Sub Kategori 2</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100" />
+
+                      {/* Content */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Konten</p>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Judul Dokumen <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              name="title"
+                              value={docForm.title}
+                              onChange={handleDocFormChange}
+                              placeholder="Masukkan judul dokumen..."
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              required
+                            />
+                          </div>
+
+                          {(docForm.type === "pdf" || docForm.type === "ebook" || docForm.type === "other") && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                File Dokumen <span className="text-red-500">*</span>
+                              </label>
+                              <div className="space-y-2">
+                                <div
+                                  className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center cursor-pointer hover:border-orange-400 transition-colors"
+                                  onClick={() => document.getElementById("doc-file-input").click()}
+                                >
+                                  {docUploadFile ? (
+                                    <div className="text-green-600 font-medium">{docUploadFile.name}</div>
+                                  ) : (
+                                    <div className="text-gray-500">
+                                      <div className="text-2xl mb-1">+</div>
+                                      <div className="text-sm">Klik untuk upload file</div>
+                                    </div>
+                                  )}
+                                </div>
+                                <input
+                                  id="doc-file-input"
+                                  type="file"
+                                  accept=".pdf,.doc,.docx"
+                                  onChange={(e) => setDocUploadFile(e.target.files[0])}
+                                  className="hidden"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {docForm.type === "video" && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">URL Video <span className="text-red-500">*</span></label>
+                              <input
+                                type="url"
+                                name="url"
+                                value={docForm.url}
+                                onChange={handleDocFormChange}
+                                placeholder="https://youtube.com/watch?v=..."
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                required
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </form>
+
+                    {/* Modal Footer */}
+                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
+                      <button
+                        type="button"
+                        onClick={() => { setDocFormOpen(false); resetDocForm(); }}
+                        className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white hover:shadow-sm transition-all"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        form="doc-form"
+                        disabled={docSubmitting}
+                        className="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {docSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Menyimpan...
+                          </>
+                        ) : (
+                          editingDocId ? "Simpan Perubahan" : "Tambah Dokumen"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {view === "site_images" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Image className="w-5 h-5 text-pink-600" />
+                  Kelola Gambar Halaman
+                </h2>
+                <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                  <ArrowLeft className="w-4 h-4" /> Kembali
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Konsultasi Image */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-800">Gambar Halaman Konsultasi</h3>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    {siteImages.konsultasi_image ? (
+                      <img
+                        src={`http://localhost:8000/${siteImages.konsultasi_image}`}
+                        alt="Konsultasi"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                        <Image className="w-12 h-12" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleSiteImageUpload("konsultasi_image", e.target.files[0])}
+                      className="hidden"
+                      id="konsultasi-image-input"
+                    />
+                    <button
+                      onClick={() => document.getElementById("konsultasi-image-input").click()}
+                      disabled={siteImageUploading.konsultasi_image}
+                      className="w-full px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {siteImageUploading.konsultasi_image ? "Mengupload..." : "Ganti Gambar"}
                     </button>
                   </div>
+                </div>
 
-                  {/* Summary cards */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
-                      <p className="text-3xl font-bold text-indigo-700">{chatStats?.active_total ?? "…"}</p>
-                      <p className="text-sm text-indigo-600 mt-1">Chat Aktif</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                      <p className="text-3xl font-bold text-green-700">{chatStats?.completed_total ?? "…"}</p>
-                      <p className="text-sm text-green-600 mt-1">Chat Selesai</p>
-                    </div>
+                {/* Produk Image */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-800">Gambar Halaman Produk</h3>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    {siteImages.produk_image ? (
+                      <img
+                        src={`http://localhost:8000/${siteImages.produk_image}`}
+                        alt="Produk"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                        <Image className="w-12 h-12" />
+                      </div>
+                    )}
                   </div>
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleSiteImageUpload("produk_image", e.target.files[0])}
+                      className="hidden"
+                      id="produk-image-input"
+                    />
+                    <button
+                      onClick={() => document.getElementById("produk-image-input").click()}
+                      disabled={siteImageUploading.produk_image}
+                      className="w-full px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {siteImageUploading.produk_image ? "Mengupload..." : "Ganti Gambar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Per psikolog table */}
-                  <h3 className="text-base font-semibold text-gray-700 mb-3">Chat Aktif per Psikolog</h3>
-                  {!chatStats ? (
-                    <p className="text-sm text-gray-500">Memuat data…</p>
-                  ) : chatStats.per_psikolog.length === 0 ? (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500 text-sm">
-                      Tidak ada sesi chat aktif saat ini.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {chatStats.per_psikolog.map((item) => (
-                        <div
-                          key={item.psikolog_id}
-                          className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 bg-white"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
-                              {item.psikolog_name.charAt(0).toUpperCase()}
+              {siteImageError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-700 text-sm">{siteImageError}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {view === "produk_images" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Image className="w-5 h-5 text-indigo-600" />
+                  Kelola Gambar Produk
+                </h2>
+                <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                  <ArrowLeft className="w-4 h-4" /> Kembali
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Current Images Preview */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Gambar Produk Saat Ini</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((num) => (
+                      <div key={num} className="relative group">
+                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200">
+                          {produkImages[`produk_image_${num}`] ? (
+                            <img
+                              src={`http://localhost:8000/${produkImages[`produk_image_${num}`]}`}
+                              alt={`Produk Image ${num}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                              <Image className="w-8 h-8" />
                             </div>
-                            <p className="font-medium text-gray-800">{item.psikolog_name}</p>
-                          </div>
-                          <span className="bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-0.5 rounded-full">
-                            {item.active_chats} sesi aktif
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {view === "users" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <Users className="w-5 h-5 text-orange-500" />
-                      Management Users
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={openCreateUserForm}
-                        className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium transition"
-                      >
-                        + Tambah User
-                      </button>
-                      <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
-                        <ArrowLeft className="w-4 h-4" /> Kembali
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                    <input
-                      type="text"
-                      value={userSearchTerm}
-                      onChange={(e) => setUserSearchTerm(e.target.value)}
-                      placeholder="Cari nama, NIP, email, role..."
-                      className="w-full md:max-w-md border border-gray-300 rounded-lg px-3 py-2"
-                    />
-                    <p className="text-sm text-gray-600">
-                      Menampilkan {paginatedUsers.length} dari {filteredUsers.length} user
-                    </p>
-                  </div>
-
-                  {filteredUsers.length === 0 ? (
-                    <p className="text-sm text-gray-600">Belum ada user untuk ditampilkan.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                        <table className="min-w-full text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">Nama</th>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">NIP</th>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">Email</th>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">Role</th>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
-                              <th className="text-left px-4 py-3 font-semibold text-gray-700">Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {paginatedUsers.map((item) => (
-                              <tr key={item.id} className="border-t border-gray-100">
-                                <td className="px-4 py-3 text-gray-800">{item.name}</td>
-                                <td className="px-4 py-3 text-gray-600">{item.nip || "-"}</td>
-                                <td className="px-4 py-3 text-gray-600">{item.email}</td>
-                                <td className="px-4 py-3 text-gray-600">{item.status_pengguna || "-"}</td>
-                                <td className="px-4 py-3">
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                      item.is_online
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-600"
-                                    }`}
-                                  >
-                                    {item.is_online ? "Online" : "Offline"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <button
-                                      onClick={() => openEditUserForm(item)}
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      Ubah
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteUser(item.id)}
-                                      className="text-red-600 hover:underline"
-                                    >
-                                      Hapus
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          Halaman {usersCurrentPage} dari {totalUserPages}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setUsersCurrentPage((prev) => Math.max(1, prev - 1))}
-                            disabled={usersCurrentPage === 1}
-                            className="px-3 py-1.5 border border-gray-300 rounded disabled:opacity-50"
-                          >
-                            Sebelumnya
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setUsersCurrentPage((prev) => Math.min(totalUserPages, prev + 1))}
-                            disabled={usersCurrentPage === totalUserPages}
-                            className="px-3 py-1.5 border border-gray-300 rounded disabled:opacity-50"
-                          >
-                            Berikutnya
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {view === "documents" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-green-600" />
-                      Kelola Pustaka Dokumen
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={openAddDoc}
-                        className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 text-sm font-medium transition"
-                      >
-                        + Tambah Dokumen
-                      </button>
-                      <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
-                        <ArrowLeft className="w-4 h-4" /> Kembali
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <input
-                      type="text"
-                      placeholder="Cari judul dokumen..."
-                      value={docSearchTerm}
-                      onChange={(e) => setDocSearchTerm(e.target.value)}
-                      className="w-full md:w-80 border border-gray-300 rounded-lg px-4 py-2 text-sm"
-                    />
-                  </div>
-
-                  {docLoading ? (
-                    <p className="text-gray-500 text-sm py-6 text-center">Memuat dokumen...</p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">#</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Judul</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Kategori</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Sub Kategori</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Tipe</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-600">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {documents
-                            .filter((d) =>
-                              d.title?.toLowerCase().includes(docSearchTerm.toLowerCase())
-                            )
-                            .map((doc, idx) => (
-                              <tr key={doc.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 text-gray-500">{idx + 1}</td>
-                                <td className="px-4 py-3 font-medium text-gray-800 max-w-xs truncate">{doc.title}</td>
-                                <td className="px-4 py-3 text-gray-600 capitalize">{doc.category}</td>
-                                <td className="px-4 py-3 text-gray-600">{doc.sub_category}</td>
-                                <td className="px-4 py-3">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    doc.type === "video"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : doc.type === "pdf"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}>
-                                    {doc.type?.toUpperCase()}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => openEditDoc(doc)}
-                                      className="px-3 py-1 text-xs rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteDoc(doc.id)}
-                                      className="px-3 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
-                                    >
-                                      Hapus
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          {documents.filter((d) =>
-                            d.title?.toLowerCase().includes(docSearchTerm.toLowerCase())
-                          ).length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                                Belum ada dokumen
-                              </td>
-                            </tr>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ═══ BANNERS VIEW ═══ */}
-              {view === "banners" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between flex-wrap gap-2">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <ImagePlay className="w-5 h-5 text-yellow-500" />
-                      Kelola Banner Homepage
-                    </h2>
-                    <div className="flex gap-2">
-                      <button onClick={openAddBanner} className="px-4 py-2 rounded-xl bg-yellow-500 text-white hover:bg-yellow-600 text-sm font-medium transition">+ Tambah Banner</button>
-                      <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"><ArrowLeft className="w-4 h-4" /> Kembali</button>
-                    </div>
-                  </div>
-                  {bannerLoading ? (
-                    <p className="text-gray-500 text-sm py-6 text-center">Memuat banner...</p>
-                  ) : banners.length === 0 ? (
-                    <p className="text-gray-400 text-sm py-10 text-center">Belum ada banner. Klik "+ Tambah Banner" untuk menambahkan.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {banners.map((b) => (
-                        <div key={b.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                          <img src={b.image_url} alt={b.title || "Banner"} className="w-full h-40 object-cover" />
-                          <div className="p-3">
-                            <p className="font-semibold text-gray-800 truncate">{b.title || <span className="text-gray-400 italic">Tanpa judul</span>}</p>
-                            {b.subtitle && <p className="text-xs text-gray-500 truncate">{b.subtitle}</p>}
-                            <div className="flex items-center justify-between mt-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${b.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                                {b.is_active ? "Aktif" : "Nonaktif"}
-                              </span>
-                              <span className="text-xs text-gray-400">Urutan: {b.order}</span>
-                            </div>
-                            <div className="flex gap-2 mt-3">
-                              <button onClick={() => openEditBanner(b)} className="flex-1 py-1 text-xs rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200">Edit</button>
-                              <button onClick={() => handleDeleteBanner(b.id)} className="flex-1 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">Hapus</button>
-                            </div>
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ═══ SITE IMAGES VIEW ═══ */}
-              {view === "site_images" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="mb-5 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <Image className="w-5 h-5 text-pink-600" />
-                      Kelola Gambar Halaman
-                    </h2>
-                    <button onClick={() => setView("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"><ArrowLeft className="w-4 h-4" /> Kembali</button>
-                  </div>
-                  {siteImageError && (
-                    <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{siteImageError}</div>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      { key: "konsultasi_image", label: "Gambar Ilustrasi Konsultasi", hint: "Ditampilkan di kartu Konsultasi pada halaman Beranda" },
-                      { key: "produk_image",     label: "Gambar Illustrasi Produk (Kanan)",  hint: "Ditampilkan di sisi kanan bagian hero Beranda" },
-                    ].map(({ key, label, hint }) => (
-                      <div key={key} className="border border-gray-200 rounded-xl p-5 space-y-3">
-                        <p className="font-semibold text-gray-800">{label}</p>
-                        <p className="text-xs text-gray-500">{hint}</p>
-                        {siteImages[key] ? (
-                          <img src={siteImages[key]} alt={label} className="w-full h-40 object-contain rounded-lg border border-gray-100 bg-gray-50" />
-                        ) : (
-                          <div className="w-full h-40 flex items-center justify-center rounded-lg border-2 border-dashed border-gray-200 text-gray-400 text-sm bg-gray-50">Menggunakan gambar default</div>
-                        )}
-                        <label className="block">
-                          <span className="sr-only">Upload gambar</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            id={`site-img-${key}`}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleSiteImageUpload(key, file);
-                              e.target.value = "";
-                            }}
-                          />
-                          <button
-                            onClick={() => document.getElementById(`site-img-${key}`).click()}
-                            disabled={!!siteImageUploading[key]}
-                            className="w-full py-2 rounded-lg bg-pink-600 text-white text-sm hover:bg-pink-700 disabled:opacity-50"
-                          >
-                            {siteImageUploading[key] ? "Mengupload..." : "Ganti Gambar"}
-                          </button>
-                        </label>
+                        <div className="mt-2 text-center">
+                          <span className="text-sm font-medium text-gray-700">Produk {num}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-          </main>
-        </div>
-      </div>
-
-      {docFormOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className={`px-6 py-4 flex items-center justify-between ${
-              editingDocId ? "bg-blue-600" : "bg-green-600"
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
+                {/* Upload Section */}
                 <div>
-                  <h3 className="text-lg font-bold text-white">{editingDocId ? "Edit Dokumen" : "Tambah Dokumen Baru"}</h3>
-                  <p className="text-xs text-white/70">{editingDocId ? "Perbarui informasi dokumen" : "Isi formulir untuk menambah dokumen"}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setDocFormOpen(false); setDocForm(emptyDocForm); setEditingDocId(null); setDocUploadFile(null); setDocCoverFile(null); }}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto flex-1 px-6 py-5">
-              {docError && (
-                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {docError}
-                </div>
-              )}
-
-              <form onSubmit={handleDocSubmit} id="doc-form" className="space-y-5">
-                {/* Tipe & Kategori */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Klasifikasi Dokumen</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Dokumen <span className="text-red-500">*</span></label>
-                      <select name="type" value={docForm.type} onChange={handleDocFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <option value="pdf">📄 PDF</option>
-                        <option value="ebook">📚 E-Book</option>
-                        <option value="video">🎥 Video</option>
-                        <option value="other">📎 Lainnya</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Utama <span className="text-red-500">*</span></label>
-                      <select name="category" value={docForm.category} onChange={handleDocFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <option value="peraturan">Himpunan Peraturan</option>
-                        <option value="ebook">Standar Operasional</option>
-                        <option value="edukasi">Edukasi</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Sub Kategori <span className="text-red-500">*</span></label>
-                    <select name="sub_category" value={docForm.sub_category} onChange={handleDocFormChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                      <option value="">-- Pilih Sub Kategori --</option>
-                      {(docCategoryOptions[docForm.category] || []).map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-100" />
-
-                {/* Konten */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Konten</p>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Judul Dokumen <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="title"
-                        value={docForm.title}
-                        onChange={handleDocFormChange}
-                        placeholder="Masukkan judul dokumen..."
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-
-                    {(docForm.type === "pdf" || docForm.type === "ebook" || docForm.type === "other") && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          File Dokumen <span className="text-red-500">*</span>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Upload Gambar Produk Baru</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((num) => (
+                      <div key={num} className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Produk {num}
                         </label>
-                        <div className="space-y-2">
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center cursor-pointer hover:border-green-400 transition-colors"
-                            onClick={() => document.getElementById("doc-file-input").click()}>
-                            {docUploadFile ? (
-                              <p className="text-sm text-green-700 font-medium">📄 {docUploadFile.name}</p>
-                            ) : (
-                              <p className="text-sm text-gray-400">Klik untuk upload file (PDF/DOC/XLS/PPT, maks 20MB)</p>
-                            )}
-                          </div>
-                          <input id="doc-file-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                            className="hidden"
-                            onChange={(e) => { setDocUploadFile(e.target.files?.[0] || null); setDocForm(p => ({ ...p, file: "" })); }}
-                          />
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <div className="flex-1 h-px bg-gray-200" /><span>atau masukkan URL</span><div className="flex-1 h-px bg-gray-200" />
-                          </div>
-                          <input
-                            type="url"
-                            name="file"
-                            value={docUploadFile ? "" : docForm.file}
-                            disabled={!!docUploadFile}
-                            onChange={handleDocFormChange}
-                            placeholder="https://drive.google.com/file/d/..."
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
-                          />
-                          <p className="text-xs text-gray-400">💡 Bisa gunakan link Google Drive, Dropbox, OneDrive, dll.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {docForm.type === "video" && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">YouTube Embed URL <span className="text-red-500">*</span></label>
-                        <input
-                          type="url"
-                          name="video_url"
-                          value={docForm.video_url}
-                          onChange={handleDocFormChange}
-                          placeholder="https://www.youtube.com/embed/VIDEO_ID"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">💡 Gunakan format embed: youtube.com/embed/VIDEO_ID</p>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Cover <span className="text-gray-400 font-normal">(opsional)</span></label>
-                      <div className="space-y-2">
-                        <div className="border-2 border-dashed border-gray-200 rounded-lg p-2 text-center cursor-pointer hover:border-blue-300 transition-colors"
-                          onClick={() => document.getElementById("doc-cover-input").click()}>
-                          {docCoverFile ? (
-                            <p className="text-sm text-blue-700 font-medium">🖼 {docCoverFile.name}</p>
+                        <div
+                          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 transition-colors"
+                          onClick={() => document.getElementById(`produk-image-${num}`).click()}
+                        >
+                          {produkImageFiles[`produk_image_${num}`] ? (
+                            <div className="space-y-2">
+                              <div className="text-green-600 font-medium">
+                                {produkImageFiles[`produk_image_${num}`].name}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {(produkImageFiles[`produk_image_${num}`].size / 1024 / 1024).toFixed(2)} MB
+                              </div>
+                            </div>
                           ) : (
-                            <p className="text-xs text-gray-400">Upload gambar cover (opsional)</p>
+                            <div className="space-y-2">
+                              <Image className="w-8 h-8 mx-auto text-gray-400" />
+                              <div className="text-sm text-gray-600">Klik untuk upload</div>
+                              <div className="text-xs text-gray-500">JPG, PNG, GIF (Max 2MB)</div>
+                            </div>
                           )}
                         </div>
-                        <input id="doc-cover-input" type="file" accept="image/*" className="hidden"
-                          onChange={(e) => { setDocCoverFile(e.target.files?.[0] || null); setDocForm(p => ({ ...p, cover: "" })); }}
-                        />
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <div className="flex-1 h-px bg-gray-200" /><span>atau URL</span><div className="flex-1 h-px bg-gray-200" />
-                        </div>
                         <input
-                          type="url"
-                          name="cover"
-                          value={docCoverFile ? "" : docForm.cover}
-                          disabled={!!docCoverFile}
-                          onChange={handleDocFormChange}
-                          placeholder="https://... (gambar thumbnail)"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+                          id={`produk-image-${num}`}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleProdukImageFileChange(`produk_image_${num}`, e.target.files[0])}
+                          className="hidden"
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi <span className="text-gray-400 font-normal">(opsional)</span></label>
-                      <textarea
-                        name="description"
-                        value={docForm.description}
-                        onChange={handleDocFormChange}
-                        rows="3"
-                        placeholder="Deskripsi singkat tentang dokumen ini..."
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                      />
-                    </div>
+                    ))}
                   </div>
                 </div>
-              </form>
-            </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => { setDocFormOpen(false); setDocForm(emptyDocForm); setEditingDocId(null); setDocUploadFile(null); setDocCoverFile(null); }}
-                className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white hover:shadow-sm transition-all"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                form="doc-form"
-                disabled={docSubmitting}
-                className={`px-5 py-2 rounded-lg text-sm text-white font-medium transition-all disabled:opacity-50 ${
-                  editingDocId ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"
-                }`}
-              >
-                {docSubmitting ? (
-                  <span className="flex items-center gap-2"><svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Menyimpan...</span>
-                ) : (editingDocId ? "Simpan Perubahan" : "Tambah Dokumen")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                {/* Error Message */}
+                {produkImageError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-700 text-sm">{produkImageError}</p>
+                  </div>
+                )}
 
-      {/* ═══ BANNER MODAL ═══ */}
-      {bannerFormOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="px-6 py-4 bg-yellow-500 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">{editingBannerId ? "Edit Banner" : "Tambah Banner Baru"}</h3>
-              <button onClick={() => { setBannerFormOpen(false); setBannerFile(null); }} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-6 py-5">
-              {bannerError && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{bannerError}</div>}
-              <form onSubmit={handleBannerSubmit} id="banner-form" className="space-y-4">
-                {/* Image upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Gambar Banner {!editingBannerId && <span className="text-red-500">*</span>}
-                    {editingBannerId && <span className="text-gray-400 font-normal"> (opsional, biarkan kosong untuk tidak mengubah gambar)</span>}
-                  </label>
-                  <div
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-yellow-400 transition-colors"
-                    onClick={() => document.getElementById("banner-img-input").click()}
+                {/* Upload Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleProdukImageUpload}
+                    disabled={produkImageUploading.all}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {bannerFile ? (
-                      <img src={URL.createObjectURL(bannerFile)} alt="preview" className="max-h-36 mx-auto rounded-lg object-cover" />
-                    ) : editingBannerId ? (
-                      <p className="text-sm text-gray-400">Klik untuk ganti gambar (opsional)</p>
+                    {produkImageUploading.all ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Mengupload...
+                      </>
                     ) : (
-                      <p className="text-sm text-gray-400">Klik untuk pilih gambar (JPG/PNG/WEBP, maks 5MB)</p>
+                      <>
+                        <Image className="w-4 h-4" />
+                        Upload Gambar
+                      </>
                     )}
-                  </div>
-                  <input id="banner-img-input" type="file" accept="image/*" className="hidden"
-                    onChange={(e) => setBannerFile(e.target.files?.[0] || null)} />
+                  </button>
                 </div>
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Judul <span className="text-gray-400 font-normal">(opsional)</span></label>
-                  <input type="text" value={bannerForm.title} onChange={(e) => setBannerForm(p => ({ ...p, title: e.target.value }))}
-                    placeholder="Judul banner..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                </div>
-                {/* Subtitle */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Subjudul <span className="text-gray-400 font-normal">(opsional)</span></label>
-                  <input type="text" value={bannerForm.subtitle} onChange={(e) => setBannerForm(p => ({ ...p, subtitle: e.target.value }))}
-                    placeholder="Subjudul..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                </div>
-                {/* Order */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Urutan</label>
-                  <input type="number" min="0" value={bannerForm.order} onChange={(e) => setBannerForm(p => ({ ...p, order: parseInt(e.target.value) || 0 }))}
-                    className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                  <p className="text-xs text-gray-400 mt-1">Angka lebih kecil = tampil lebih awal</p>
-                </div>
-                {/* Is Active */}
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="banner-active" checked={bannerForm.is_active}
-                    onChange={(e) => setBannerForm(p => ({ ...p, is_active: e.target.checked }))}
-                    className="w-4 h-4 text-yellow-500 border-gray-300 rounded" />
-                  <label htmlFor="banner-active" className="text-sm font-medium text-gray-700">Tampilkan di homepage</label>
-                </div>
-              </form>
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
-              <button type="button" onClick={() => { setBannerFormOpen(false); setBannerFile(null); }}
-                className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white">Batal</button>
-              <button type="submit" form="banner-form" disabled={bannerSubmitting}
-                className="px-5 py-2 rounded-lg text-sm text-white font-medium bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50">
-                {bannerSubmitting ? "Menyimpan..." : (editingBannerId ? "Simpan Perubahan" : "Tambah Banner")}
-              </button>
+          )}
+
+          {view === "survey" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-blue-600" />
+                  Survey Kepuasan
+                </h2>
+                <button onClick={() => handleViewChange("menu")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition">
+                  <ArrowLeft className="w-4 h-4" /> Kembali
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Survey Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-semibold text-blue-800">Total Survey</h3>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">0</p>
+                    <p className="text-sm text-blue-600">Respons</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-5 h-5 text-green-600" />
+                      <h3 className="font-semibold text-green-800">Kepuasan</h3>
+                    </div>
+                    <p className="text-2xl font-bold text-green-900">0%</p>
+                    <p className="text-sm text-green-600">Rata-rata</p>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <LayoutGrid className="w-5 h-5 text-purple-600" />
+                      <h3 className="font-semibold text-purple-800">Bulan Ini</h3>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-900">0</p>
+                    <p className="text-sm text-purple-600">Survey</p>
+                  </div>
+                </div>
+
+                {/* Survey Actions */}
+                <div className="flex flex-wrap gap-3">
+                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                    <FileBarChart2 className="w-4 h-4 inline mr-2" />
+                    Lihat Laporan
+                  </button>
+                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium">
+                    <RefreshCw className="w-4 h-4 inline mr-2" />
+                    Refresh Data
+                  </button>
+                </div>
+
+                {/* Placeholder untuk data survey */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-600 text-sm">
+                  <Star className="w-8 h-8 text-gray-400 mx-auto mb-3" />
+                  <p className="font-medium text-gray-700 mb-1">Data Survey Kepuasan</p>
+                  <p>Fitur analisis survey kepuasan akan segera tersedia.</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {userFormOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className={`px-6 py-4 flex items-center justify-between ${
-              editingUserId ? "bg-blue-600" : "bg-orange-500"
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">{editingUserId ? "Ubah Data User" : "Tambah User Baru"}</h3>
-                  <p className="text-xs text-white/70">{editingUserId ? "Perbarui informasi akun pengguna" : "Isi formulir untuk membuat akun baru"}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setUserFormOpen(false); resetUserForm(); }}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto flex-1 px-6 py-5">
-            {userError && (
-              <div className="mb-4 p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm flex items-start gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {userError}
-              </div>
-            )}
-
-            <form onSubmit={handleUserSubmit} id="user-form" className="space-y-5">
-              {/* Informasi Akun */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Informasi Akun</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap <span className="text-red-500">*</span></label>
-                    <input name="name" value={userForm.name} onChange={handleUserFormChange} required placeholder="Masukkan nama lengkap" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">NIP <span className="text-red-500">*</span></label>
-                    <input name="nip" value={userForm.nip} onChange={handleUserFormChange} required placeholder="Nomor Induk Pegawai" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-                    <input type="email" name="email" value={userForm.email} onChange={handleUserFormChange} required placeholder="contoh@email.com" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">No WhatsApp</label>
-                    <input name="no_wa" value={userForm.no_wa} onChange={handleUserFormChange} placeholder="+62 812-3456-7890" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-100" />
-
-              {/* Informasi Jabatan */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Informasi Jabatan</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pangkat / Golongan</label>
-                    <input name="pangkat_golongan" value={userForm.pangkat_golongan} onChange={handleUserFormChange} placeholder="Penata / III-C" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Jabatan</label>
-                    <input name="jabatan" value={userForm.jabatan} onChange={handleUserFormChange} placeholder="Staf Pengawasan" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bagian</label>
-                    <input name="bagian" value={userForm.bagian} onChange={handleUserFormChange} placeholder="Kepatuhan Internal" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Role <span className="text-red-500">*</span></label>
-                    <select name="status_pengguna" value={userForm.status_pengguna} onChange={handleUserFormChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      <option value="User">👤 User</option>
-                      <option value="Psikolog">🧠 Psikolog</option>
-                      <option value="Asisten Psikolog">🤝 Asisten Psikolog</option>
-                      <option value="Admin">🛡️ Admin</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-100" />
-
-              {/* Daftar Sebagai + Organization Detail */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Unit Kerja</p>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Daftar Sebagai</label>
-                <select name="daftar_sebagai" value={userForm.daftar_sebagai} onChange={handleUserFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <option value="">-- Pilih Unit --</option>
-                  <option value="UPT">UPT: Daerah</option>
-                  <option value="Kanwil">Kanwil: Provinsi</option>
-                  <option value="Ditjenpas">Ditjenpas: Direktorat Jenderal Pemasyarakatan</option>
-                </select>
-              </div>
-              {userForm.daftar_sebagai === "Ditjenpas" && (
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Direktorat</label>
-                  <select name="organization_detail" value={userForm.organization_detail} onChange={handleUserFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option value="">-- Pilih Direktorat --</option>
-                    {[
-                      "Sekretariat Direktorat Jenderal Pemasyarakatan",
-                      "Direktorat Perawatan Kesehatan dan Rehabilitasi",
-                      "Direktorat Pelayanan Tahanan dan Anak",
-                      "Direktorat Pembinaan Narapidana dan Anak Binaan",
-                      "Direktorat Pembimbingan Kemasyarakatan",
-                      "Direktorat Pengamanan dan Intelijen",
-                      "Direktorat Teknologi Informasi dan Kerja Sama Pemasyarakatan",
-                      "Direktorat Sistem dan Strategi Penyelenggaraan Pemasyarakatan",
-                      "Direktorat Kepatuhan Internal",
-                    ].map((dir) => <option key={dir} value={dir}>{dir}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {userForm.daftar_sebagai === "Kanwil" && (
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Kanwil</label>
-                  <select name="organization_detail" value={userForm.organization_detail} onChange={handleUserFormChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option value="">-- Pilih Kanwil --</option>
-                    {["Aceh","Bali","Banten","Bengkulu","D.I Yogyakarta","DKI Jakarta","Gorontalo","Jambi","Jawa Barat","Jawa Tengah","Jawa Timur","Kalimantan Barat","Kalimantan Selatan","Kalimantan Tengah","Kalimatan Timur","Kepulauan Bangka Belitung","Kepulauan Riau","Lampung","Maluku","Maluku Utara","Nusa Tenggara Barat","Nusa Tenggara Timur","Papua","Papua Barat","Riau","Sulawesi Barat","Sulawesi Selatan","Sulawesi Tengah","Sulawesi Tenggara","Sulawesi Utara","Sumatera Barat","Sumatera Selatan","Sumatera Utara"].map((k) => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {userForm.daftar_sebagai === "UPT" && (
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Provinsi UPT</label>
-                    <select value={userUptProvince} onChange={handleUserUptProvinceChange} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      <option value="">-- Pilih Provinsi --</option>
-                      {UPT_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pilih UPT</label>
-                    <select
-                      value={userForm.organization_detail.startsWith(`${userUptProvince} - `) ? userForm.organization_detail.replace(`${userUptProvince} - `, "") : ""}
-                      onChange={handleUserUptDetailChange}
-                      disabled={!userUptProvince}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
-                    >
-                      <option value="">-- Pilih UPT --</option>
-                      {(UPT_BY_PROVINCE[userUptProvince] || []).map((upt) => <option key={upt} value={upt}>{upt}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t border-gray-100" />
-
-              {/* Password */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  Password {editingUserId && <span className="text-gray-400 normal-case font-normal">(kosongkan jika tidak ingin mengubah)</span>}
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Password {!editingUserId && <span className="text-red-500">*</span>}
-                    </label>
-                    <input type="password" name="password" value={userForm.password} onChange={handleUserFormChange} placeholder="Minimal 8 karakter" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Konfirmasi Password</label>
-                    <input type="password" name="password_confirmation" value={userForm.password_confirmation} onChange={handleUserFormChange} placeholder="Ulangi password" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                  </div>
-                </div>
-              </div>
-            </form>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => { setUserFormOpen(false); resetUserForm(); }}
-                className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white hover:shadow-sm transition-all"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                form="user-form"
-                disabled={userSubmitting}
-                className={`px-5 py-2 rounded-lg text-sm text-white font-medium transition-all disabled:opacity-50 ${
-                  editingUserId ? "bg-blue-600 hover:bg-blue-700" : "bg-orange-500 hover:bg-orange-600"
-                }`}
-              >
-                {userSubmitting ? (
-                  <span className="flex items-center gap-2"><svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Menyimpan...</span>
-                ) : (editingUserId ? "Simpan Perubahan" : "Buat Akun")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
+        </main>
+      </div>
     </div>
   );
 }

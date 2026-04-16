@@ -107,7 +107,7 @@ export default function PustakaDokumenDynamic() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/documents");
+      const response = await api.get("/documents");
       const payload = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response?.data?.data)
@@ -222,8 +222,6 @@ export default function PustakaDokumenDynamic() {
 
   // Sub kategori untuk peraturan
   const subKategoriPeraturan = [
-    { id: "uud", title: "Undang-Undang Dasar Negara Republik Indonesia Tahun 1945 (UUD 1945)" },
-    { id: "tap-mpr", title: "Ketetapan Majelis Permusyawaratan Rakyat (TAP MPR)" },
     { id: "uu-perppu", title: "Undang-Undang (UU) / Peraturan Pemerintah Pengganti Undang-Undang (Perppu)" },
     { id: "pp", title: "Peraturan Pemerintah (PP)" },
     { id: "perpres", title: "Peraturan Presiden (Perpres)" },

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import { getPusher } from '../lib/pusher';
 import UserDropdownMenu from '../components/UserDropdownMenu';
@@ -7,7 +7,16 @@ import { MessageCircle } from 'lucide-react';
 
 export default function Chat() {
   const { consultationId } = useParams();
+  const [searchParams] = useSearchParams();
+  const expertType = searchParams.get('expert');
   const navigate = useNavigate();
+
+  // Debug: Log URL parameters
+  console.log('Chat.jsx - URL params:', {
+    consultationId,
+    expertType,
+    allParams: Object.fromEntries(searchParams.entries())
+  });
 
   const [user, setUser]               = useState(null);
   const [consultation, setConsultation] = useState(null);
@@ -17,8 +26,6 @@ export default function Chat() {
   const [sending, setSending]         = useState(false);
   const [error, setError]             = useState(null);
   const [deletingMsgId, setDeletingMsgId] = useState(null);
-  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
-  const [deletingAll, setDeletingAll]   = useState(false);
   const [confirmEndChat, setConfirmEndChat] = useState(false);
   const [endingChat, setEndingChat]       = useState(false);
 
@@ -29,7 +36,7 @@ export default function Chat() {
 
   // â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
-    api.get('/api/user')
+    api.get('/user')
       .then((r) => setUser(r.data?.user ?? r.data))
       .catch(() => navigate('/login'));
   }, [navigate]);
@@ -39,8 +46,8 @@ export default function Chat() {
     if (!consultationId) return;
 
     Promise.all([
-      api.get(`/api/consultations/${consultationId}`),
-      api.get(`/api/chat/${consultationId}/messages`),
+      api.get(`/consultations/${consultationId}`),
+      api.get(`/chat/${consultationId}/messages`),
     ])
       .then(([consultRes, msgRes]) => {
         setConsultation(consultRes.data);
@@ -102,7 +109,7 @@ export default function Chat() {
       // Skip polling when Pusher is connected and subscribed
       if (pusherReady.current) return;
       try {
-        const { data } = await api.get(`/api/chat/${consultationId}/messages`);
+        const { data } = await api.get(`/chat/${consultationId}/messages`);
         const incoming = Array.isArray(data) ? data : [];
         setMessages((prev) => {
           const existingIds = new Set(prev.map((m) => String(m.id)));
@@ -112,8 +119,9 @@ export default function Chat() {
           if (newMsgs.length === 0) return prev;
           return [...prev, ...newMsgs];
         });
-      } catch (_) {
-        // silently ignore poll errors
+      } catch (err) {
+        // Silently ignore poll errors (keep variable used for ESLint).
+        void err;
       }
     };
 
@@ -150,7 +158,7 @@ export default function Chat() {
     setSending(true);
 
     try {
-      const { data } = await api.post(`/api/chat/${consultationId}/messages`, { message: text });
+      const { data } = await api.post(`/chat/${consultationId}/messages`, { message: text });
       setMessages((prev) => prev.map((m) => (m.id === tempId ? data : m)));
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
@@ -172,7 +180,7 @@ export default function Chat() {
     if (String(msgId).startsWith('temp-')) return;
     setDeletingMsgId(msgId);
     try {
-      await api.delete(`/api/chat/${consultationId}/messages/${msgId}`);
+      await api.delete(`/chat/${consultationId}/messages/${msgId}`);
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
     } catch (err) {
       console.error('Failed to delete message:', err);
@@ -181,23 +189,10 @@ export default function Chat() {
     }
   };
 
-  const deleteAllMessages = async () => {
-    setDeletingAll(true);
-    try {
-      await api.delete(`/api/chat/${consultationId}/messages`);
-      setMessages([]);
-      setConfirmDeleteAll(false);
-    } catch (err) {
-      console.error('Failed to delete all messages:', err);
-    } finally {
-      setDeletingAll(false);
-    }
-  };
-
   const endChat = async () => {
     setEndingChat(true);
     try {
-      const { data } = await api.post(`/api/chat/${consultationId}/end`);
+      const { data } = await api.post(`/chat/${consultationId}/end`);
       setConsultation(data.consultation);
       setConfirmEndChat(false);
     } catch (err) {
@@ -208,7 +203,7 @@ export default function Chat() {
   };
 
   const handleLogout = async () => {
-    try { await api.post('/api/logout'); } catch (_) {/* ignore */}
+    try { await api.post('/logout'); } catch (err) { void err; }
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user_role');
     navigate('/');
@@ -228,7 +223,7 @@ export default function Chat() {
     if (!consultation || !user) return '…';
     if (user.status_pengguna === 'User')     return consultation.psikolog?.name ?? 'Psikolog';
     if (user.status_pengguna === 'Psikolog') return consultation.user?.name ?? 'User';
-    return `${consultation.user?.name ?? 'User'} â†” ${consultation.psikolog?.name ?? 'Psikolog'}`;
+    return `${consultation.user?.name ?? 'User'} -> ${consultation.psikolog?.name ?? 'Psikolog'}`;
   };
 
   // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -253,7 +248,7 @@ export default function Chat() {
 
   // ─── No consultationId: show picker ──────────────────────────────────────
   if (!consultationId) {
-    return <ConsultationPicker user={user} onLogout={handleLogout} />;
+    return <ConsultationPicker user={user} onLogout={handleLogout} expertType={expertType} />;
   }
 
   return (
@@ -286,13 +281,6 @@ export default function Chat() {
                 Akhiri Chat
               </button>
             )}
-            <button
-              onClick={() => setConfirmDeleteAll(true)}
-              className="text-xs bg-red-500/80 hover:bg-red-600 px-3 py-1 rounded transition"
-              title="Hapus semua pesan"
-            >
-              Hapus Semua Chat
-            </button>
             <Link
               to="/chat"
               className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded transition"
@@ -324,34 +312,6 @@ export default function Chat() {
                   className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition"
                 >
                   {endingChat ? 'Mengakhiri…' : 'Ya, Akhiri Chat'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Confirm delete all modal */}
-        {confirmDeleteAll && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-              <h3 className="text-lg font-bold text-gray-800 mb-2">Hapus Semua Pesan?</h3>
-              <p className="text-sm text-gray-500 mb-5">
-                Semua pesan dalam sesi ini akan dihapus permanen dan tidak dapat dikembalikan.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setConfirmDeleteAll(false)}
-                  disabled={deletingAll}
-                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={deleteAllMessages}
-                  disabled={deletingAll}
-                  className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
-                >
-                  {deletingAll ? 'Menghapus…' : 'Ya, Hapus Semua'}
                 </button>
               </div>
             </div>
@@ -472,16 +432,16 @@ export default function Chat() {
 
 // ─── ConsultationPicker ────────────────────────────────────────────────────
 // Shown when navigating to /chat without a consultationId.
-function ConsultationPicker({ user, onLogout }) {
+function ConsultationPicker({ user, onLogout, expertType }) {
   const navigate = useNavigate();
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading]             = useState(true);
-  const [confirmDelete, setConfirmDelete] = useState(null); // consultation object
-  const [deletingId, setDeletingId]       = useState(null);
   const [activeTab, setActiveTab]         = useState('active'); // 'active' | 'history'
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState(null);
+  const [deletingSessionId, setDeletingSessionId] = useState(null);
 
   useEffect(() => {
-    api.get('/api/consultations')
+    api.get('/consultations')
       .then((r) => {
         const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
         // Only consultations that have a psikolog assigned (chat-eligible)
@@ -491,22 +451,22 @@ function ConsultationPicker({ user, onLogout }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleDeleteConsultation = async () => {
-    if (!confirmDelete) return;
-    setDeletingId(confirmDelete.id);
-    try {
-      await api.delete(`/api/consultations/${confirmDelete.id}`);
-      setConsultations((prev) => prev.filter((c) => c.id !== confirmDelete.id));
-      setConfirmDelete(null);
-    } catch (err) {
-      console.error('Failed to delete consultation:', err);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   const activeChats  = consultations.filter((c) => c.status !== 'completed');
   const historyChats = consultations.filter((c) => c.status === 'completed');
+
+  const handleDeleteAllMessages = async () => {
+    if (!confirmDeleteSession) return;
+
+    setDeletingSessionId(confirmDeleteSession.id);
+    try {
+      await api.delete(`/chat/${confirmDeleteSession.id}/messages`);
+      setConfirmDeleteSession(null);
+    } catch (err) {
+      console.error('Failed to delete all session messages:', err);
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
 
   const renderCard = (c, isHistory) => {
     const partner = user?.status_pengguna === 'User'
@@ -536,10 +496,10 @@ function ConsultationPicker({ user, onLogout }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => setConfirmDelete(c)}
-            className="text-xs text-red-500 border border-red-300 hover:bg-red-50 px-3 py-1.5 rounded-lg transition"
+            onClick={() => setConfirmDeleteSession(c)}
+            className="text-xs text-red-600 border border-red-300 hover:bg-red-50 px-3 py-1.5 rounded-lg transition"
           >
-            Hapus Chat
+            Hapus Semua Chat
           </button>
           <button
             onClick={() => navigate(`/chat/${c.id}`)}
@@ -564,8 +524,14 @@ function ConsultationPicker({ user, onLogout }) {
       </header>
 
       <div className="max-w-2xl w-full mx-auto px-4 py-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-1">Chat Konsultasi</h2>
-        <p className="text-sm text-gray-500 mb-6">Pilih sesi konsultasi untuk memulai atau melihat riwayat chat.</p>
+        <h2 className="text-xl font-bold text-gray-800 mb-1">
+          {expertType === 'kasubdit' ? 'Chat Konsultasi Teknis' : 'Chat Konsultasi Psikolog'}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          {expertType === 'kasubdit' 
+            ? 'Pilih sesi konsultasi teknis untuk bantuan compliance dan regulasi.' 
+            : 'Pilih sesi konsultasi psikolog untuk dukungan kesehatan mental dan wellbeing.'}
+        </p>
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 mb-5">
@@ -610,10 +576,14 @@ function ConsultationPicker({ user, onLogout }) {
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                 <p className="text-gray-500 mb-4">Belum ada sesi chat aktif.</p>
                 <Link
-                  to="/consultation"
-                  className="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg text-sm hover:bg-blue-700"
+                  to={expertType === 'kasubdit' ? "/consultation?type=teknis" : "/consultation?type=psikolog"}
+                  className={`inline-block px-5 py-2 rounded-lg text-sm hover:opacity-90 transition ${
+                    expertType === 'kasubdit' 
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' 
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
+                  }`}
                 >
-                  Buat Konsultasi
+                  Buat Konsultasi {expertType === 'kasubdit' ? 'Teknis' : 'Psikolog'}
                 </Link>
               </div>
             ) : (
@@ -636,36 +606,36 @@ function ConsultationPicker({ user, onLogout }) {
           </div>
         )}
 
-        {/* Confirm delete all messages modal */}
-        {confirmDelete && (
+        {confirmDeleteSession && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-              <h3 className="text-lg font-bold text-gray-800 mb-2">Hapus Riwayat Chat?</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">Hapus Semua Chat?</h3>
               <p className="text-sm text-gray-500 mb-1">
-                Sesi <span className="font-medium">#{confirmDelete.id}</span> &ndash; {user?.status_pengguna === 'User' ? 'Psikolog' : 'User'}: {user?.status_pengguna === 'User' ? (confirmDelete.psikolog?.name ?? 'Psikolog') : (confirmDelete.user?.name ?? 'User')}
+                Sesi <span className="font-medium">#{confirmDeleteSession.id}</span> &ndash; {user?.status_pengguna === 'User' ? 'Psikolog' : 'User'}: {user?.status_pengguna === 'User' ? (confirmDeleteSession.psikolog?.name ?? 'Psikolog') : (confirmDeleteSession.user?.name ?? 'User')}
               </p>
               <p className="text-sm text-gray-500 mb-5">
-                Riwayat chat ini akan dihapus permanen dari daftar Anda. Pihak lain tetap dapat melihatnya.
+                Semua pesan pada sesi ini akan dihapus permanen dan tidak dapat dikembalikan.
               </p>
               <div className="flex justify-end gap-3">
                 <button
-                  onClick={() => setConfirmDelete(null)}
-                  disabled={deletingId === confirmDelete.id}
+                  onClick={() => setConfirmDeleteSession(null)}
+                  disabled={deletingSessionId === confirmDeleteSession.id}
                   className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition"
                 >
                   Batal
                 </button>
                 <button
-                  onClick={handleDeleteConsultation}
-                  disabled={deletingId === confirmDelete.id}
+                  onClick={handleDeleteAllMessages}
+                  disabled={deletingSessionId === confirmDeleteSession.id}
                   className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
                 >
-                  {deletingId === confirmDelete.id ? 'Menghapus…' : 'Ya, Hapus Permanen'}
+                  {deletingSessionId === confirmDeleteSession.id ? 'Menghapus…' : 'Ya, Hapus Semua'}
                 </button>
               </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

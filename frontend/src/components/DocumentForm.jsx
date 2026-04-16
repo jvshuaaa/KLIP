@@ -19,8 +19,6 @@ export default function DocumentForm({ onSuccess, onCancel }) {
 
   const categoryOptions = {
     peraturan: [
-      { id: "uud", label: "UUD 1945" },
-      { id: "tap-mpr", label: "TAP MPR" },
       { id: "uu-perppu", label: "UU / Perppu" },
       { id: "pp", label: "Peraturan Pemerintah (PP)" },
       { id: "perpres", label: "Peraturan Presiden (Perpres)" },
@@ -94,7 +92,7 @@ export default function DocumentForm({ onSuccess, onCancel }) {
         return;
       }
 
-      const response = await api.post("/api/documents", formData);
+      await api.post("/documents", formData);
 
       setSuccess(true);
       setFormData({

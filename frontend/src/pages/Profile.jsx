@@ -80,7 +80,7 @@ export default function Profile() {
 
   const fetchUser = async () => {
     try {
-      const response = await api.get('/api/user');
+      const response = await api.get('/user');
       const userData = response?.data?.user || response?.data;
       const initialDaftarSebagai = userData.daftar_sebagai || '';
       const initialOrganizationDetail = userData.organization_detail || '';
@@ -140,7 +140,7 @@ export default function Profile() {
       formData.append('foto', file);
       formData.append('foto_position_x', String(photoZoom));
 
-      const response = await api.post('/api/profile/update-foto', formData);
+      const response = await api.post('/profile/update-foto', formData);
 
       if (response?.data?.user) {
         setUser(response.data.user);
@@ -167,7 +167,7 @@ export default function Profile() {
       const formData = new FormData();
       formData.append('foto_position_x', String(photoZoom));
 
-      const response = await api.post('/api/profile/update-foto', formData);
+      const response = await api.post('/profile/update-foto', formData);
       if (response?.data?.user) {
         setUser(response.data.user);
       }
@@ -257,7 +257,7 @@ export default function Profile() {
     setUpdating(true);
 
     try {
-      await api.put('/api/profile/update', formData);
+      await api.put('/profile/update', formData);
       setSuccess('Profil berhasil diperbarui');
       await fetchUser();
       setIsEditing(false);
@@ -278,7 +278,7 @@ export default function Profile() {
 
   const handleLogout = async () => {
     try {
-      await api.post('/api/logout');
+      await api.post('/logout');
       // Clear the stored token
       localStorage.removeItem('auth_token');
       delete api.defaults.headers.common['Authorization'];

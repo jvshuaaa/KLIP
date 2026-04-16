@@ -1,12 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/axios';
 import UserDropdownMenu from '../components/UserDropdownMenu';
-import { LayoutDashboard, ClipboardList, FileBarChart2, Plus, History, MessageSquare, Home, CheckCircle, X, UserCheck } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, FileBarChart2, Plus, History, MessageSquare, Home, CheckCircle, X, UserCheck, Settings, FileText, Send } from 'lucide-react';
 
 export default function Consultation() {
   const navigate = useNavigate();
-  const [view, setView] = useState('menu'); // menu | history | choose_psikolog | create
+  const [searchParams] = useSearchParams();
+  const consultationType = searchParams.get('type') || 'psikolog'; // psikolog | teknis
+  const [view, setView] = useState('menu'); // menu | history | choose_psikolog | create | create_teknis
+
+  // Debug: Log URL parameters
+  console.log('Consultation.jsx - URL params:', {
+    consultationType,
+    allParams: Object.fromEntries(searchParams.entries())
+  });
+
+  // Auto-redirect to create_teknis if consultation type is teknis
+  useEffect(() => {
+    if (consultationType === 'teknis' && view === 'menu') {
+      setView('create_teknis');
+    }
+  }, [consultationType, view]);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
@@ -58,6 +73,15 @@ export default function Consultation() {
     q5: '',
     q6: '',
     q7: '',
+  });
+
+  const [teknisForm, setTeknisForm] = useState({
+    subject: '',
+    description: '',
+    urgency: 'medium', // low | medium | high
+    subdit: 'advokasi', // advokasi | pencegahan
+    category: 'patnal_integritas', // patnal_integritas | kepatuhan | investigasi | pelanggaran
+    attachment: null,
   });
 
   const selectedPsychologist = useMemo(
@@ -156,7 +180,7 @@ export default function Consultation() {
   // Fetch user data
   async function fetchUser() {
     try {
-      const response = await api.get('/api/user');
+      const response = await api.get('/user');
       const userData = response?.data?.user || response?.data;
 
       if ((userData?.status_pengguna || '').toLowerCase() === 'admin') {
@@ -191,7 +215,7 @@ export default function Consultation() {
     setError(null);
 
     try {
-      const response = await api.get('/api/consultations/psychologists');
+      const response = await api.get('/consultations/psychologists');
       const list = Array.isArray(response?.data) ? response.data : [];
       setPsychologists(list);
       if (list.length > 0 && !selectedPsychologistId) {
@@ -210,7 +234,7 @@ export default function Consultation() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/api/consultations');
+      const response = await api.get('/consultations');
       setConsultations(response.data);
     } catch (err) {
       console.error('Failed to fetch consultations:', err);
@@ -229,7 +253,7 @@ export default function Consultation() {
 
     try {
       setAvailabilitySaving(true);
-      const response = await api.put('/api/consultations/psychologists/availability', {
+      const response = await api.put('/consultations/psychologists/availability', {
         is_available: nextValue,
       });
 
@@ -260,7 +284,7 @@ export default function Consultation() {
 
   async function fetchAssistants() {
     try {
-      const response = await api.get('/api/consultations/assistants');
+      const response = await api.get('/consultations/assistants');
       setAssistants(Array.isArray(response?.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to fetch assistants:', err);
@@ -272,7 +296,7 @@ export default function Consultation() {
     setError(null);
     try {
       setAssigningId(selectedAssigneeId);
-      const response = await api.post(`/api/consultations/${selectedConsultation.id}/assign`, {
+      const response = await api.post(`/consultations/${selectedConsultation.id}/assign`, {
         assignee_id: Number(selectedAssigneeId),
       });
       const updated = response?.data?.consultation;
@@ -298,7 +322,7 @@ export default function Consultation() {
 
     try {
       setFollowUpSubmitting(true);
-      const response = await api.put(`/api/consultations/${selectedConsultation.id}`, {
+      const response = await api.put(`/consultations/${selectedConsultation.id}`, {
         status: followUpForm.status,
         notes: followUpForm.notes,
       });
@@ -324,7 +348,7 @@ export default function Consultation() {
     setError(null);
     try {
       setMarkingCompleted(true);
-      const response = await api.post(`/api/consultations/${selectedConsultation.id}/complete`);
+      const response = await api.post(`/consultations/${selectedConsultation.id}/complete`);
       const updatedConsultation = response?.data?.consultation;
       if (updatedConsultation) {
         setSelectedConsultation(updatedConsultation);
@@ -345,7 +369,7 @@ export default function Consultation() {
     setError(null);
     setSuccess(null);
     try {
-      const response = await api.get(`/api/consultations/export/${format}`, {
+      const response = await api.get(`/consultations/export/${format}`, {
         responseType: 'blob',
       });
 
@@ -387,6 +411,63 @@ export default function Consultation() {
     setForm((p) => ({ ...p, [name]: value }));
   }
 
+  function handleTeknisChange(e) {
+    const { name, value } = e.target;
+    setTeknisForm((p) => ({ ...p, [name]: value }));
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files[0];
+    setTeknisForm((p) => ({ ...p, attachment: file }));
+  }
+
+  async function handleTeknisSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('subject', teknisForm.subject);
+      formData.append('description', teknisForm.description);
+      formData.append('urgency', teknisForm.urgency);
+      formData.append('subdit', teknisForm.subdit);
+      formData.append('category', teknisForm.category);
+      if (teknisForm.attachment) {
+        formData.append('attachment', teknisForm.attachment);
+      }
+      formData.append('type', 'teknis');
+
+      await api.post('/consultations', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setSuccess('Konsultasi PATNAL berhasil dikirim. Tim kami akan segera merespon.');
+      setTeknisForm({
+        subject: '',
+        description: '',
+        urgency: 'medium',
+        subdit: 'advokasi',
+        category: 'patnal_integritas',
+        attachment: null,
+      });
+      setView('history');
+    } catch (err) {
+      console.error('Submit PATNAL consultation failed:', err);
+      if (err.response?.status === 401) {
+        setError('Sesi Anda telah berakhir. Silakan login kembali.');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setError(err.response?.data?.message || 'Gagal mengirim konsultasi PATNAL. Silakan coba lagi.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function resolvePhotoUrl(photoUrl) {
     if (!photoUrl) return '';
     if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
@@ -407,7 +488,7 @@ export default function Consultation() {
     setError(null);
     setSuccess(null);
     try {
-      await api.post('/api/consultations', {
+      await api.post('/consultations', {
         ...form,
         psikolog_id: selectedPsychologistId,
       });
@@ -430,7 +511,7 @@ export default function Consultation() {
 
   const handleLogout = async () => {
     try {
-      await api.post('/api/logout');
+      await api.post('/logout');
       localStorage.removeItem('auth_token');
       delete api.defaults.headers.common['Authorization'];
       navigate('/');
@@ -533,312 +614,6 @@ export default function Consultation() {
           </div>
         </div>
       )}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <a href="/" className="flex items-center">
-            <img src="/Logo.png" alt="KLIP" className="h-10 md:h-11 w-auto object-contain" />
-          </a>
-          <UserDropdownMenu user={user} onLogout={handleLogout} />
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar */}
-          <aside className="md:w-64 flex-shrink-0">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 pt-4 pb-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Menu</p>
-              </div>
-              <nav className="pb-2">
-                <a href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
-                  <LayoutDashboard className="w-4 h-4 flex-shrink-0" /> Dashboard
-                </a>
-                <a href="/consultation" className="flex items-center gap-3 px-4 py-2.5 text-blue-700 bg-blue-50 font-semibold text-sm border-l-4 border-blue-600">
-                  <ClipboardList className="w-4 h-4 flex-shrink-0" /> Konsultasi
-                </a>
-                {isPsikolog && (
-                  <a href="/reports" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
-                    <FileBarChart2 className="w-4 h-4 flex-shrink-0" /> Laporan
-                  </a>
-                )}
-              </nav>
-            </div>
-          </aside>
-
-          <main className="flex-1 min-w-0">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h1 className="text-3xl font-bold mb-6">Konsultasi</h1>
-
-              {view === 'menu' && (
-                <div className="space-y-4">
-                  {isPsikolog && (
-                    <div className={`flex items-center justify-between gap-4 p-4 rounded-2xl border ${
-                      user?.is_available ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                          user?.is_available ? 'bg-green-100' : 'bg-red-100'
-                        }`}>
-                          <CheckCircle className={`w-5 h-5 ${user?.is_available ? 'text-green-600' : 'text-red-500'}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">Status Ketersediaan</p>
-                          <p className={`text-xs font-medium ${user?.is_available ? 'text-green-700' : 'text-red-700'}`}>
-                            {user?.is_available ? 'Anda tersedia untuk konsultasi' : 'Anda tidak tersedia'}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleToggleAvailability}
-                        disabled={availabilitySaving}
-                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors flex-shrink-0 ${
-                          user?.is_available ? 'bg-green-500' : 'bg-red-400'
-                        } ${availabilitySaving ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        aria-label="Toggle ketersediaan psikolog"
-                      >
-                        <span
-                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                            user?.is_available ? 'translate-x-8' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {isPsikolog ? (
-                    <>
-                      <button onClick={() => setView('history')} className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
-                          <ClipboardList className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Hasil Assesment</p>
-                        <p className="text-xs text-gray-500">Lihat hasil assesment klien.</p>
-                      </button>
-
-                      <button onClick={() => setView('history')} className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-300 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mb-3 group-hover:bg-gray-600 transition-colors">
-                          <History className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Riwayat Konsultasi</p>
-                        <p className="text-xs text-gray-500">Lihat status dan detail konsultasi sebelumnya.</p>
-                      </button>
-
-                      <a href="/chat" className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-600 transition-colors">
-                          <MessageSquare className="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Chat Klien</p>
-                        <p className="text-xs text-gray-500">Akses percakapan langsung dengan klien.</p>
-                      </a>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={openConsent} className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
-                          <Plus className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Buat Konsultasi</p>
-                        <p className="text-xs text-gray-500">Isi form profiling untuk memulai sesi konseling.</p>
-                      </button>
-
-                      <button onClick={() => setView('history')} className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-300 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mb-3 group-hover:bg-gray-600 transition-colors">
-                          <History className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Riwayat Konsultasi</p>
-                        <p className="text-xs text-gray-500">Lihat status dan detail konsultasi sebelumnya.</p>
-                      </button>
-
-                      <a href="/chat" className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-600 transition-colors">
-                          <MessageSquare className="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Chat Psikolog</p>
-                        <p className="text-xs text-gray-500">Akses percakapan langsung setelah profiling selesai.</p>
-                      </a>
-
-                      <a href="/dashboard" className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all p-5 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-green-50 rounded-bl-full opacity-70" />
-                        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-600 transition-colors">
-                          <Home className="w-5 h-5 text-green-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <p className="font-semibold text-gray-800 text-sm mb-1">Kembali ke Dashboard</p>
-                        <p className="text-xs text-gray-500">Kembali ke ringkasan fitur dan progres Anda.</p>
-                      </a>
-                    </>
-                  )}
-                </div>
-                </div>
-              )}
-
-              {view === 'history' && (
-                <div className="mt-2">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-            <h2 className="text-xl font-semibold">Riwayat Konsultasi</h2>
-            {canExport && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleExportConsultations('pdf')}
-                  disabled={exportingFormat !== null}
-                  className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {exportingFormat === 'pdf' ? 'Mengunduh...' : 'Export PDF'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExportConsultations('excel')}
-                  disabled={exportingFormat !== null}
-                  className="px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {exportingFormat === 'excel' ? 'Mengunduh...' : 'Export Excel'}
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {loading && <p className="text-sm text-gray-600">Memuat riwayat...</p>}
-          
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded flex items-center justify-between gap-3">
-              <span>{error}</span>
-              <button
-                type="button"
-                onClick={fetchConsultations}
-                className="text-sm font-medium underline hover:no-underline whitespace-nowrap"
-              >
-                Coba Lagi
-              </button>
-            </div>
-          )}
-
-          {/* Notice for regular users when they have an active consultation */}
-          {!isPsikolog && !isAdmin && !loading && consultations.length > 0 && (
-            <div className="mb-4 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
-              </svg>
-              <p className="text-sm text-blue-800 leading-relaxed">
-                <span className="font-semibold">Mohon ditunggu,</span> data sedang kami proses. Silakan cek menu <a href="/chat" className="underline font-medium hover:text-blue-900">chat</a> secara berkala.
-              </p>
-            </div>
-          )}
-
-          {isPsikolog && consultations.length > 0 && (
-            <div className="mb-4 p-4 border border-blue-100 bg-blue-50 rounded-2xl">
-              <p className="text-sm font-semibold text-blue-800 mb-3">Filter Wilayah / UPT</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-blue-700 mb-1">Tipe Lokasi</label>
-                  <select
-                    value={locationTypeFilter}
-                    onChange={(e) => setLocationTypeFilter(e.target.value)}
-                    className="w-full border border-blue-200 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="all">Semua Tipe</option>
-                    <option value="upt">UPT</option>
-                    <option value="kanwil">Kanwil</option>
-                    <option value="ditjenpas">Direktorat (Ditjenpas)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-blue-700 mb-1">Lokasi / Unit</label>
-                  <select
-                    value={locationDetailFilter}
-                    onChange={(e) => setLocationDetailFilter(e.target.value)}
-                    className="w-full border border-blue-200 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="all">Semua Lokasi</option>
-                    {availableLocationDetails.map((detail) => (
-                      <option key={detail} value={detail}>{detail}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <p className="text-xs text-blue-700 mt-3">
-                Menampilkan {filteredConsultations.length} dari {consultations.length} data assesment.
-              </p>
-            </div>
-          )}
-          
-          {!loading && consultations.length === 0 && (
-            <p className="text-sm text-gray-600">Belum ada riwayat konsultasi.</p>
-          )}
-
-          {!loading && consultations.length > 0 && filteredConsultations.length === 0 && (
-            <p className="text-sm text-gray-600">Tidak ada data assesment pada filter lokasi yang dipilih.</p>
-          )}
-
-          {!loading && filteredConsultations.length > 0 && (
-            <div className="space-y-4">
-              {filteredConsultations.map((consultation) => (
-                <div
-                  key={consultation.id}
-                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all cursor-pointer"
-                  onClick={() => openConsultationDetail(consultation)}
-                >
-                  <div className="flex justify-between items-start gap-3 mb-3">
-                    <div>
-                      <h3 className="font-semibold text-base text-gray-900">Konsultasi #{consultation.id}</h3>
-                      <p className="text-sm text-gray-600 mt-0.5">
-                        <span className="font-medium">{consultation.user?.name || '-'}</span>
-                        {consultation.user?.organization_detail
-                          ? <span className="text-gray-400"> · {getLocationLabel(consultation)}</span>
-                          : null}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {new Date(consultation.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </p>
-                    </div>
-                    <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(consultation.status)}`}>
-                      {getStatusLabel(consultation.status)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                    <span className="font-medium text-gray-700">Keluhan:</span> {consultation.q3}
-                  </p>
-                  {consultation.psikolog && (
-                    <p className="text-xs text-blue-600 mt-2 font-medium">
-                      Ditangani: {consultation.psikolog.name}
-                    </p>
-                  )}
-                  {consultation.notes && (
-                    <div className="mt-2 px-3 py-2 bg-blue-50 rounded-xl text-xs text-blue-800">
-                      <strong>Catatan:</strong> {consultation.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-                  <div className="mt-5 flex items-center gap-3">
-                    {!isPsikolog && (
-                      <button
-                        onClick={() => setView('create')}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-                      >
-                        <Plus className="w-4 h-4" /> Buat Konsultasi Baru
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setView('menu')}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
-                    >
-                      Kembali
-                    </button>
-                  </div>
-                </div>
-              )}
 
       {/* Modal for consultation detail */}
       {selectedConsultation && (
@@ -1002,6 +777,487 @@ export default function Consultation() {
           </div>
         </div>
       )}
+
+      <div className="container mx-auto px-6 py-12">
+        <div className="max-w-6xl mx-auto">
+          {/* Header Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {consultationType === 'teknis' ? 'Konsultasi Teknis' : 'Konsultasi Psikolog'}
+                </h1>
+                <p className="text-gray-600">
+                  {consultationType === 'teknis' 
+                    ? 'Layanan konsultasi teknis untuk kepatuhan dan regulasi internal.'
+                    : 'Layanan konsultasi psikologis untuk kesehatan mental dan wellbeing.'}
+                </p>
+              </div>
+              <UserDropdownMenu user={user} onLogout={handleLogout} />
+            </div>
+          </div>
+
+          {/* Main Content Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <>
+              {view === 'menu' && (
+                <>
+                  {isPsikolog && (
+                    <div className={`flex items-center justify-between gap-4 p-4 rounded-2xl border ${
+                      user?.is_available ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                          user?.is_available ? 'bg-green-100' : 'bg-red-100'
+                        }`}>
+                          <CheckCircle className={`w-5 h-5 ${user?.is_available ? 'text-green-600' : 'text-red-500'}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">Status Ketersediaan</p>
+                          <p className={`text-xs font-medium ${user?.is_available ? 'text-green-700' : 'text-red-700'}`}>
+                            {user?.is_available ? 'Anda tersedia untuk konsultasi' : 'Anda tidak tersedia'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleToggleAvailability}
+                        disabled={availabilitySaving}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors flex-shrink-0 ${
+                          user?.is_available ? 'bg-green-500' : 'bg-red-400'
+                        } ${availabilitySaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        aria-label="Toggle ketersediaan psikolog"
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                            user?.is_available ? 'translate-x-8' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                  {isPsikolog ? (
+                    <>
+                      <button onClick={() => setView('history')} className="group text-left bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+                          <ClipboardList className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Hasil Assesment</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Lihat hasil assesment klien Anda dan kelola konsultasi yang sedang berlangsung.</p>
+                      </button>
+
+                      <button onClick={() => setView('history')} className="group text-left bg-gradient-to-br from-gray-50 to-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-gray-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gray-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4 group-hover:bg-gray-600 transition-colors">
+                          <History className="w-6 h-6 text-gray-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Riwayat Konsultasi</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Lihat status dan detail konsultasi sebelumnya untuk monitoring dan pelaporan.</p>
+                      </button>
+
+                      <a href="/chat" className="group text-left bg-gradient-to-br from-purple-50 to-white rounded-2xl border border-purple-100 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-purple-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4 group-hover:bg-purple-600 transition-colors">
+                          <MessageSquare className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Chat Klien</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Akses percakapan langsung dengan klien untuk sesi konseling interaktif.</p>
+                      </a>
+
+                      <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl border border-green-100 shadow-sm p-6 h-full flex flex-col justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4">
+                          <FileBarChart2 className="w-6 h-6 text-green-600" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Laporan & Analitik</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Akses laporan lengkap dan analitik konsultasi untuk keperluan administrasi.</p>
+                        <a href="/reports" className="mt-4 inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm">
+                          Lihat Laporan <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={consultationType === 'teknis' ? () => setView('create_teknis') : openConsent} className={`group text-left bg-gradient-to-br ${consultationType === 'teknis' ? 'from-blue-50 to-cyan-50 border-blue-100' : 'from-purple-50 to-indigo-50 border-purple-100'} rounded-2xl border shadow-sm hover:shadow-lg hover:border-blue-200 transition-all p-6 overflow-hidden relative h-full`}>
+                        <div className={`absolute top-0 right-0 w-20 h-20 ${consultationType === 'teknis' ? 'bg-blue-50' : 'bg-purple-50'} rounded-bl-full opacity-70`} />
+                        <div className={`w-12 h-12 rounded-xl ${consultationType === 'teknis' ? 'bg-blue-100' : 'bg-purple-100'} flex items-center justify-center mb-4 ${consultationType === 'teknis' ? 'group-hover:bg-blue-600' : 'group-hover:bg-purple-600'} transition-colors`}>
+                          {consultationType === 'teknis' ? (
+                            <Settings className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
+                          ) : (
+                            <Plus className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
+                          )}
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">
+                          {consultationType === 'teknis' ? 'Buat Konsultasi Teknis' : 'Buat Konsultasi Psikolog'}
+                        </p>
+                        <p className="text-sm text-gray-500 leading-relaxed">
+                          {consultationType === 'teknis' 
+                            ? 'Ajukan pertanyaan teknis seputar compliance, regulasi, dan SOP.'
+                            : 'Isi form profiling untuk memulai sesi konseling dengan psikolog bersertifikat.'}
+                        </p>
+                      </button>
+
+                      <button onClick={() => setView('history')} className="group text-left bg-gradient-to-br from-gray-50 to-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-gray-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gray-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4 group-hover:bg-gray-600 transition-colors">
+                          <History className="w-6 h-6 text-gray-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Riwayat Konsultasi</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Lihat status dan detail konsultasi sebelumnya untuk monitoring perkembangan.</p>
+                      </button>
+
+                      <a href="/chat" className="group text-left bg-gradient-to-br from-purple-50 to-white rounded-2xl border border-purple-100 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-purple-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4 group-hover:bg-purple-600 transition-colors">
+                          <MessageSquare className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Chat Psikolog</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Akses percakapan langsung setelah profiling selesai untuk sesi konseling.</p>
+                      </a>
+
+                      <a href="/dashboard" className="group text-left bg-gradient-to-br from-green-50 to-white rounded-2xl border border-green-100 shadow-sm hover:shadow-lg hover:border-green-200 transition-all p-6 overflow-hidden relative h-full">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-green-50 rounded-bl-full opacity-70" />
+                        <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
+                          <Home className="w-6 h-6 text-green-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <p className="font-semibold text-gray-800 text-lg mb-2">Kembali ke Dashboard</p>
+                        <p className="text-sm text-gray-500 leading-relaxed">Kembali ke ringkasan fitur dan progres integritas Anda.</p>
+                      </a>
+                    </>
+                  )}
+                  </div>
+                </>
+              )}
+
+              {view === 'history' && (
+                <div className="mt-2">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <h2 className="text-xl font-semibold">Riwayat Konsultasi</h2>
+            {canExport && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleExportConsultations('pdf')}
+                  disabled={exportingFormat !== null}
+                  className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {exportingFormat === 'pdf' ? 'Mengunduh...' : 'Export PDF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportConsultations('excel')}
+                  disabled={exportingFormat !== null}
+                  className="px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {exportingFormat === 'excel' ? 'Mengunduh...' : 'Export Excel'}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {loading && <p className="text-sm text-gray-600">Memuat riwayat...</p>}
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={fetchConsultations}
+                className="text-sm font-medium underline hover:no-underline whitespace-nowrap"
+              >
+                Coba Lagi
+              </button>
+            </div>
+          )}
+
+          {/* Notice for regular users when they have an active consultation */}
+          {!isPsikolog && !isAdmin && !loading && consultations.length > 0 && (
+            <div className="mb-4 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
+              </svg>
+              <p className="text-sm text-blue-800 leading-relaxed">
+                <span className="font-semibold">Mohon ditunggu,</span> data sedang kami proses. Silakan cek menu <a href="/chat" className="underline font-medium hover:text-blue-900">chat</a> secara berkala.
+              </p>
+            </div>
+          )}
+
+          {isPsikolog && consultations.length > 0 && (
+            <div className="mb-4 p-4 border border-blue-100 bg-blue-50 rounded-2xl">
+              <p className="text-sm font-semibold text-blue-800 mb-3">Filter Wilayah / UPT</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-blue-700 mb-1">Tipe Lokasi</label>
+                  <select
+                    value={locationTypeFilter}
+                    onChange={(e) => setLocationTypeFilter(e.target.value)}
+                    className="w-full border border-blue-200 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="all">Semua Tipe</option>
+                    <option value="upt">UPT</option>
+                    <option value="kanwil">Kanwil</option>
+                    <option value="ditjenpas">Direktorat (Ditjenpas)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-blue-700 mb-1">Lokasi / Unit</label>
+                  <select
+                    value={locationDetailFilter}
+                    onChange={(e) => setLocationDetailFilter(e.target.value)}
+                    className="w-full border border-blue-200 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="all">Semua Lokasi</option>
+                    {availableLocationDetails.map((detail) => (
+                      <option key={detail} value={detail}>{detail}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-blue-700 mt-3">
+                Menampilkan {filteredConsultations.length} dari {consultations.length} data assesment.
+              </p>
+            </div>
+          )}
+          
+          {!loading && consultations.length === 0 && (
+            <p className="text-sm text-gray-600">Belum ada riwayat konsultasi.</p>
+          )}
+
+          {!loading && consultations.length > 0 && filteredConsultations.length === 0 && (
+            <p className="text-sm text-gray-600">Tidak ada data assesment pada filter lokasi yang dipilih.</p>
+          )}
+
+          {!loading && filteredConsultations.length > 0 && (
+            <div className="space-y-4">
+              {filteredConsultations.map((consultation) => (
+                <div
+                  key={consultation.id}
+                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all cursor-pointer"
+                  onClick={() => openConsultationDetail(consultation)}
+                >
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div>
+                      <h3 className="font-semibold text-base text-gray-900">Konsultasi #{consultation.id}</h3>
+                      <p className="text-sm text-gray-600 mt-0.5">
+                        <span className="font-medium">{consultation.user?.name || '-'}</span>
+                        {consultation.user?.organization_detail
+                          ? <span className="text-gray-400"> · {getLocationLabel(consultation)}</span>
+                          : null}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(consultation.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                    <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(consultation.status)}`}>
+                      {getStatusLabel(consultation.status)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                    <span className="font-medium text-gray-700">Keluhan:</span> {consultation.q3}
+                  </p>
+                  {consultation.psikolog && (
+                    <p className="text-xs text-blue-600 mt-2 font-medium">
+                      Ditangani: {consultation.psikolog.name}
+                    </p>
+                  )}
+                  {consultation.notes && (
+                    <div className="mt-2 px-3 py-2 bg-blue-50 rounded-xl text-xs text-blue-800">
+                      <strong>Catatan:</strong> {consultation.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+                  <div className="mt-5 flex items-center gap-3">
+                    {!isPsikolog && (
+                      <button
+                        onClick={() => setView('create')}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+                      >
+                        <Plus className="w-4 h-4" /> Buat Konsultasi Baru
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setView('menu')}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+                    >
+                      Kembali
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Modal for consultation detail */}
+      {selectedConsultation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedConsultation(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex justify-between items-start mb-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Konsultasi #{selectedConsultation.id}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{selectedConsultation.user?.name || '-'}</span>
+                  <span className="mx-1 text-gray-300">·</span>
+                  {new Date(selectedConsultation.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              </div>
+              <button onClick={() => setSelectedConsultation(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Status + psikolog */}
+            <div className="flex items-center gap-2 mb-5">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(selectedConsultation.status)}`}>
+                {getStatusLabel(selectedConsultation.status)}
+              </span>
+              {selectedConsultation.psikolog && (
+                <span className="text-xs text-blue-600 font-medium">· Ditangani: {selectedConsultation.psikolog.name}</span>
+              )}
+            </div>
+
+            {/* Q&A */}
+            <div className="space-y-3 mb-5">
+              {[
+                { q: '1. Apa yang membuat Anda memutuskan untuk mengikuti konseling?', a: selectedConsultation.q1 },
+                { q: '2. Rangkaian aktivitas dalam dua minggu terakhir', a: selectedConsultation.q2 },
+                { q: '3. Keluhan/permasalahan yang ingin dikonsultasikan', a: selectedConsultation.q3 },
+                { q: '4. Apa yang akan terjadi jika tidak segera ditangani?', a: selectedConsultation.q4 },
+                { q: '5. Bentuk dukungan dari lingkungan sekitar', a: selectedConsultation.q5 },
+                { q: '6. Tantangan yang membuat melanggar prinsip kepatuhan', a: selectedConsultation.q6 },
+                { q: '7. Harapan setelah melakukan sesi konseling', a: selectedConsultation.q7 },
+              ].map(({ q, a }, idx) => (
+                <div key={idx} className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">{q}</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{a}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Catatan psikolog */}
+            {selectedConsultation.notes && (
+              <div className="mb-5 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-blue-600 mb-1">Catatan Psikolog</p>
+                <p className="text-sm text-blue-900">{selectedConsultation.notes}</p>
+              </div>
+            )}
+
+            {/* Tandai Selesai — for user when needs_referral */}
+            {!isPsikolog && !isAdmin && normalizeCaseStatus(selectedConsultation.status) === 'needs_referral' && (
+              <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800 mb-3">
+                  Anda dirujuk ke psikiater. Setelah selesai mengunjungi psikiater, tandai konsultasi ini sebagai selesai.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleMarkCompleted}
+                  disabled={markingCompleted}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {markingCompleted ? 'Memproses...' : 'Tandai Selesai'}
+                </button>
+              </div>
+            )}
+
+            {/* Tindak Lanjut — for psikolog */}
+            {isPsikolog && (
+              <div className="mb-5 bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                <h3 className="text-sm font-bold text-blue-800">Tindak Lanjut Psikolog</h3>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={followUpForm.status}
+                    onChange={(e) => setFollowUpForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="pending">Tunggu</option>
+                    <option value="in_progress">Diproses</option>
+                    <option value="needs_referral">Perlu Rujukan</option>
+                    <option value="completed">Selesai</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Catatan Psikolog</label>
+                  <textarea
+                    value={followUpForm.notes}
+                    onChange={(e) => setFollowUpForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="Tulis catatan tindak lanjut untuk klien"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmitFollowUp}
+                  disabled={followUpSubmitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {followUpSubmitting ? 'Menyimpan...' : 'Simpan Tindak Lanjut'}
+                </button>
+              </div>
+            )}
+
+            {/* Delegasikan ke Asisten */}
+            {isOnlyPsikolog && (
+              <div className="mb-5 bg-orange-50 border border-orange-100 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-orange-500" />
+                  <h3 className="text-sm font-bold text-orange-800">Delegasikan ke Asisten Psikolog</h3>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Oper tugas penanganan konsultasi ini ke Asisten Psikolog. Anda juga bisa mengambil kembali dengan memilih diri sendiri.
+                </p>
+                {selectedConsultation?.psikolog && selectedConsultation.psikolog.id !== user?.id && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-orange-100 border border-orange-200 rounded-lg text-sm">
+                    <span className="text-orange-700 font-medium">Saat ini ditangani oleh:</span>
+                    <span className="text-orange-900">{selectedConsultation.psikolog.name}</span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedAssigneeId}
+                    onChange={(e) => setSelectedAssigneeId(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option value="">— Pilih Asisten / Ambil Kembali —</option>
+                    <option value={user?.id}>Saya sendiri (ambil kembali)</option>
+                    {assistants.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}{a.is_available ? '' : ' (Tidak Tersedia)'}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAssign}
+                    disabled={!selectedAssigneeId || assigningId !== null}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {assigningId !== null ? 'Mendelegasikan...' : 'Delegasikan'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setSelectedConsultation(null)}
+                className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+              )}
 
               {view === 'choose_psikolog' && !isPsikolog && (
                 <div className="mt-2 space-y-4">
@@ -1179,10 +1435,174 @@ export default function Consultation() {
                 </div>
               )}
 
-            </div>
-          </main>
-        </div>
+              {view === 'create_teknis' && (
+                <div className="mt-2">
+                  {/* Header Section */}
+                  <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-white">Form Konsultasi Teknis PATNAL</h2>
+                        <p className="text-blue-100 text-sm">Layanan konsultasi untuk kepatuhan internal, integritas, dan regulasi</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">PATNAL</span>
+                      <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">Integritas</span>
+                      <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">Kepatuhan</span>
+                      <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-medium">Investigasi</span>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleTeknisSubmit} className="space-y-6">
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        Subjek Konsultasi
+                      </label>
+                      <input
+                        type="text"
+                        name="subject"
+                        value={teknisForm.subject}
+                        onChange={handleTeknisChange}
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        placeholder="Contoh: Pertanyaan mengenai integritas dan kepatuhan internal"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                          Subdit PATNAL
+                        </label>
+                        <select
+                          name="subdit"
+                          value={teknisForm.subdit}
+                          onChange={handleTeknisChange}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                        >
+                          <option value="advokasi">Fasilitasi Advokasi & Investigasi Internal</option>
+                          <option value="pencegahan">Pencegahan & Pengendalian</option>
+                        </select>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          Kategori Konsultasi
+                        </label>
+                        <select
+                          name="category"
+                          value={teknisForm.category}
+                          onChange={handleTeknisChange}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                        >
+                          <option value="patnal_integritas">PATNAL & Integritas</option>
+                          <option value="kepatuhan">Kepatuhan Internal</option>
+                          <option value="investigasi">Investigasi Internal</option>
+                          <option value="pelanggaran">Pelanggaran Disiplin</option>
+                        </select>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                          Tingkat Urgensi
+                        </label>
+                        <select
+                          name="urgency"
+                          value={teknisForm.urgency}
+                          onChange={handleTeknisChange}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                        >
+                          <option value="low">Rendah</option>
+                          <option value="medium">Sedang</option>
+                          <option value="high">Tinggi</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        Deskripsi Detail
+                      </label>
+                      <textarea
+                        name="description"
+                        value={teknisForm.description}
+                        onChange={handleTeknisChange}
+                        required
+                        rows={6}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all resize-none"
+                        placeholder="Jelaskan secara detail pertanyaan mengenai PATNAL, integritas, atau kepatuhan internal..."
+                      />
+                      <div className="mt-2 text-xs text-gray-500">
+                        <span className="inline-flex items-center gap-1">
+                          <span>Minimal 20 karakter untuk deskripsi yang jelas</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200 p-5 shadow-sm">
+                      <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                        Lampiran Dokumen (Opsional)
+                      </label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
+                        <input
+                          type="file"
+                          onChange={handleFileChange}
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          className="hidden"
+                          id="file-upload"
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                              <FileText className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-700">Klik untuk upload atau drag & drop</p>
+                            <p className="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, JPEG (Max 5MB)</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setView('menu')}
+                        className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all flex items-center gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3 rounded-xl text-sm font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Mengirim...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4" />
+                            Kirim Konsultasi Teknis
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
       </div>
-    </div>
   );
 }

@@ -27,7 +27,7 @@ export default function AdminReports() {
   const fetchConsultations = async () => {
     try {
       setDataLoading(true);
-      const response = await api.get("/api/consultations");
+      const response = await api.get("/consultations");
       const payload = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response?.data?.data)
@@ -50,7 +50,7 @@ export default function AdminReports() {
         return;
       }
 
-      const response = await api.get("/api/user");
+      const response = await api.get("/user");
       const userData = response?.data?.user || response?.data;
 
       if (!isAdminUser(userData)) {
@@ -74,7 +74,7 @@ export default function AdminReports() {
 
   const handleLogout = async () => {
     try {
-      await api.post("/api/logout");
+      await api.post("/logout");
       localStorage.removeItem("auth_token");
       delete api.defaults.headers.common.Authorization;
       navigate("/");
@@ -89,7 +89,7 @@ export default function AdminReports() {
   const handleExportConsultations = async (type) => {
     try {
       setExportingType(type);
-      const response = await api.get(`/api/consultations/export/${type}`, {
+      const response = await api.get(`/consultations/export/${type}`, {
         responseType: "blob",
       });
 

@@ -18,7 +18,7 @@ export default function Banner() {
 
   // Fetch banners from API
   useEffect(() => {
-    fetch(`${API_BASE}/api/banners`)
+    fetch(`${API_BASE}/banners`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {

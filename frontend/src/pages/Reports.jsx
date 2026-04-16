@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/axios";
 import UserDropdownMenu from "../components/UserDropdownMenu";
-import { LayoutDashboard, ClipboardList, FileBarChart2, RefreshCw } from "lucide-react";
+import { LayoutDashboard, ClipboardList, FileBarChart2, RefreshCw, Star } from "lucide-react";
 
 export default function Reports() {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ export default function Reports() {
         return;
       }
 
-      const response = await api.get("/api/user");
+      const response = await api.get("/user");
       const userData = response?.data?.user || response?.data;
       const role = (userData?.status_pengguna || "").toLowerCase();
 
@@ -53,7 +53,7 @@ export default function Reports() {
   const fetchConsultations = async () => {
     try {
       setDataLoading(true);
-      const response = await api.get("/api/consultations");
+      const response = await api.get("/consultations");
       const payload = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response?.data?.data)
@@ -196,7 +196,7 @@ export default function Reports() {
   const handleExportConsultations = async (type) => {
     try {
       setExportingType(type);
-      const response = await api.get(`/api/consultations/export/${type}`, {
+      const response = await api.get(`/consultations/export/${type}`, {
         responseType: "blob",
       });
 
@@ -234,7 +234,7 @@ export default function Reports() {
 
   const handleLogout = async () => {
     try {
-      await api.post("/api/logout");
+      await api.post("/logout");
       localStorage.removeItem("auth_token");
       delete api.defaults.headers.common.Authorization;
       navigate("/");
@@ -295,6 +295,9 @@ export default function Reports() {
                 </a>
                 <a href="/reports" className="flex items-center gap-3 px-4 py-2.5 text-blue-700 bg-blue-50 font-semibold text-sm border-l-4 border-blue-600">
                   <FileBarChart2 className="w-4 h-4 flex-shrink-0" /> Laporan
+                </a>
+                <a href="/admin/survey" className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent">
+                  <Star className="w-4 h-4 flex-shrink-0" /> Survey Kepuasan
                 </a>
               </nav>
             </div>

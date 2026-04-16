@@ -1,18 +1,8 @@
 import React, { useState, useEffect } from "react";
 
-export default function PustakaDokumen({ itemsProp }) {
+export default function PustakaDokumen() {
   // === DATA DOKUMEN BERDASARKAN SUB-KATEGORI ===
   const subKategoriPeraturan = [
-    {
-      id: "uud",
-      title: "Undang-Undang Dasar Negara Republik Indonesia Tahun 1945 (UUD 1945)",
-      items: [],
-    },
-    {
-      id: "tap-mpr",
-      title: "Ketetapan Majelis Permusyawaratan Rakyat (TAP MPR)",
-      items: [],
-    },
     {
       id: "uu-perppu",
       title: "Undang-Undang (UU) / Peraturan Pemerintah Pengganti Undang-Undang (Perppu)",

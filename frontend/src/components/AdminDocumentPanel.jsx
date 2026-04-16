@@ -16,7 +16,7 @@ export default function AdminDocumentPanel() {
   const fetchPendingDocuments = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/api/documents/admin/pending");
+      const response = await api.get("/documents/admin/pending");
       const payload = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response?.data?.data)
@@ -35,7 +35,7 @@ export default function AdminDocumentPanel() {
 
   const handleApprove = async (docId) => {
     try {
-      await api.post(`/api/documents/${docId}/approve`, {});
+      await api.post(`/documents/${docId}/approve`, {});
 
       // Hapus dari list
       setDocuments(documents.filter((doc) => doc.id !== docId));
@@ -53,7 +53,7 @@ export default function AdminDocumentPanel() {
     }
 
     try {
-      await api.post(`/api/documents/${docId}/reject`, { reason: rejectReason });
+      await api.post(`/documents/${docId}/reject`, { reason: rejectReason });
 
       // Hapus dari list
       setDocuments(documents.filter((doc) => doc.id !== docId));

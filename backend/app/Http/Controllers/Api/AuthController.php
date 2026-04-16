@@ -26,7 +26,8 @@ class AuthController extends Controller
             ->orWhereRaw('LOWER(email) = ?', [mb_strtolower($identifier)])
             ->first();
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        $storedPassword = $user?->password ?? '$2y$10$'.str_repeat('a', 53);
+        if (! Hash::check($password, $storedPassword) || ! $user) {
             throw ValidationException::withMessages([
                 'nip' => ['NIP/Email atau password tidak sesuai.'],
             ]);

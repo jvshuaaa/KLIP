@@ -47,7 +47,7 @@ return [
     |
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    'encrypt' => env('SESSION_ENCRYPT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -200,7 +200,7 @@ return [
     */
 
     // Allow cross-site cookies for local SPA development (Sanctum)
-    // In production you may want to set this via env depending on your setup.
+    // In production, prefer LAX or STRICT to reduce CSRF risk.
     'same_site' => env('SESSION_SAME_SITE', 'none'),
 
     /*

@@ -34,6 +34,7 @@ class User extends Authenticatable
         'status_pengguna',
         'is_available',
         'organization_detail',
+        'status_approval',
     ];
 
     /**

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import api from "../lib/axios";
+import { ChevronDown } from "lucide-react";
 
 export default function Header() {
   const location = useLocation();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [scrollHidden, setScrollHidden] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showKonsultasiDropdown, setShowKonsultasiDropdown] = useState(false);
 
   // === HIDE HEADER ON SCROLL ===
   useEffect(() => {
@@ -36,10 +38,10 @@ export default function Header() {
           return;
         }
 
-        const response = await api.get("/api/user");
+        const response = await api.get("/user");
         const userData = response?.data?.user || response?.data;
         setCurrentUser(userData || null);
-      } catch (error) {
+      } catch {
         setCurrentUser(null);
         localStorage.removeItem("auth_token");
       }
@@ -53,8 +55,9 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      await api.post("/api/logout");
-    } catch (error) {
+      await api.post("/logout");
+    } catch (err) {
+      void err;
     } finally {
       localStorage.removeItem("auth_token");
       delete api.defaults.headers.common["Authorization"];
@@ -97,11 +100,42 @@ export default function Header() {
             </a>
           </div>
 
-          {/* === NAVIGASI DESKTOP (Tanpa Dropdown) === */}
+          {/* === NAVIGASI DESKTOP (Dengan Dropdown Konsultasi) === */}
           <nav className="hidden md:flex space-x-10 font-medium text-[15px] items-center">
             <a href="/" className="text-gray-700 hover:text-blue-600 transition">Beranda</a>
             
-            <a href="/consultation" className="text-gray-700 hover:text-blue-600 transition">Konsultasi</a>
+            {/* Dropdown Konsultasi */}
+            <div className="relative">
+              <button
+                onMouseEnter={() => setShowKonsultasiDropdown(true)}
+                onMouseLeave={() => setShowKonsultasiDropdown(false)}
+                className="text-gray-700 hover:text-blue-600 transition flex items-center gap-1"
+              >
+                Konsultasi
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              
+              {showKonsultasiDropdown && (
+                <div
+                  onMouseEnter={() => setShowKonsultasiDropdown(true)}
+                  onMouseLeave={() => setShowKonsultasiDropdown(false)}
+                  className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+                >
+                  <a
+                    href="/consultation"
+                    className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                  >
+                    Konsultasi Psikolog
+                  </a>
+                  <a
+                    href="/konsultasi-teknis"
+                    className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                  >
+                    Konsultasi Teknis
+                  </a>
+                </div>
+              )}
+            </div>
 
             {/* Sekarang Media Informasi langsung berupa Link (bukan Button Dropdown) */}
             <a 
@@ -110,6 +144,8 @@ export default function Header() {
             >
               Media Informasi
             </a>
+
+            <a href="/survey" className="text-gray-700 hover:text-blue-600 transition">Survey Kepuasan</a>
 
             <a href="/tentang" className="text-gray-700 hover:text-blue-600 transition">Tentang Kami</a>
 
@@ -137,7 +173,22 @@ export default function Header() {
 
         <nav className="flex flex-col py-4">
           <a href="/" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Beranda</a>
-          <a href="/consultation" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Konsultasi</a>
+          
+          {/* Dropdown Konsultasi Mobile */}
+          <div className="border-b border-gray-50">
+            <div className="px-6 py-4 text-gray-700 font-medium flex items-center justify-between">
+              Konsultasi
+              <ChevronDown className="w-4 h-4" />
+            </div>
+            <div className="bg-gray-50">
+              <a href="/consultation" className="block px-12 py-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 text-sm" onClick={closeMobileMenu}>
+                Konsultasi Psikolog
+              </a>
+              <a href="/konsultasi-teknis" className="block px-12 py-3 text-gray-600 hover:bg-blue-50 hover:text-blue-600 text-sm" onClick={closeMobileMenu}>
+                Konsultasi Teknis
+              </a>
+            </div>
+          </div>
           
           <a 
             href={location.pathname === "/" ? "#pustakadokumen" : "/#pustakadokumen"} 
@@ -146,6 +197,8 @@ export default function Header() {
           >
             Media Informasi
           </a>
+
+          <a href="/survey" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Survey Kepuasan</a>
 
           <a href="/tentang" className="px-6 py-4 text-gray-700 hover:bg-blue-50 font-medium border-b border-gray-50" onClick={closeMobileMenu}>Tentang Kami</a>
 

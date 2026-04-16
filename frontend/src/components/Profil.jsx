@@ -41,7 +41,7 @@ export default function Profil({ initialUser }) {
         organization_detail: user.unit,
       };
 
-      const response = await api.put("/api/profile/update", payload);
+      const response = await api.put("/profile/update", payload);
       const updatedUser = response?.data?.user;
 
       if (updatedUser) {
@@ -96,7 +96,7 @@ export default function Profil({ initialUser }) {
       formData.append("foto", file);
       formData.append("foto_position_x", String(user?.foto_position_x ?? 50));
       formData.append("foto_position_y", String(user?.foto_position_y ?? 50));
-      const response = await api.post("/api/profile/update-foto", formData);
+      const response = await api.post("/profile/update-foto", formData);
       setUser((prev) => ({
         ...prev,
         foto: response.data?.foto || localPreviewUrl,

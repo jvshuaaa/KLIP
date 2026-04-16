@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// The backend API root. Set VITE_API_URL in your .env (e.g http://localhost:8000)
-// When empty, fall back to the default development port where artisan serve runs.
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// The backend API root. Set VITE_API_URL in your .env (e.g. http://localhost:8000 or http://localhost:8000/api)
+const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const normalizedBaseURL = rawBaseURL.replace(/\/$/, '');
+const baseURL = normalizedBaseURL.endsWith('/api') ? normalizedBaseURL : `${normalizedBaseURL}/api`;
 
 const api = axios.create({
   baseURL,
@@ -23,9 +24,6 @@ api.interceptors.request.use(config => {
 
   // Avoid stale browser/proxy cache for dynamic API reads (user/profile/lists).
   if ((config.method || 'get').toLowerCase() === 'get') {
-    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    config.headers.Pragma = 'no-cache';
-    config.headers.Expires = '0';
     config.params = {
       ...(config.params || {}),
       _t: Date.now(),

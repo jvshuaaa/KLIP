@@ -9,26 +9,28 @@ use Illuminate\Support\Facades\Storage;
 
 class SiteSettingController extends Controller
 {
-    private const ALLOWED_KEYS = ['konsultasi_image', 'produk_image'];
+    private const ALLOWED_KEYS = ['konsultasi_image', 'produk_image', 'produk_image_1', 'produk_image_2', 'produk_image_3', 'produk_image_4'];
 
     private function isAdmin($user): bool
     {
-        return $user && (
-            ($user->status_pengguna ?? '') === 'Admin' ||
-            strtolower((string) ($user->daftar_sebagai ?? '')) === 'admin'
-        );
+        if (!$user) {
+            return false;
+        }
+        
+        $statusPengguna = strtolower((string) ($user->status_pengguna ?? ''));
+        $daftarSebagai = strtolower((string) ($user->daftar_sebagai ?? ''));
+        
+        return $statusPengguna === 'admin' || $daftarSebagai === 'admin';
     }
 
-    /** GET /api/site-settings — public */
     public function index()
     {
         $result = [];
         foreach (self::ALLOWED_KEYS as $key) {
             $value = SiteSetting::getValue($key);
             if ($value) {
-                $result[$key] = preg_match('/^https?:\/\//', $value)
-                    ? $value
-                    : Storage::disk('public')->url($value);
+                // Use asset() for consistent URL generation
+                $result[$key] = asset($value);
             } else {
                 $result[$key] = null;
             }
@@ -70,5 +72,163 @@ class SiteSettingController extends Controller
                 'url' => Storage::disk('public')->url($setting->value),
             ],
         ]);
+    }
+
+    public function updateSurveyImages(Request $request)
+    {
+        try {
+            $request->validate([
+                'survey_image_1' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'survey_image_2' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'survey_image_3' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'survey_image_4' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ]);
+
+            $updatedImages = [];
+
+            for ($i = 1; $i <= 4; $i++) {
+                $key = "survey_image_{$i}";
+                
+                if ($request->hasFile($key)) {
+                    $image = $request->file($key);
+                    $imageName = time() . "_survey_{$i}." . $image->getClientOriginalExtension();
+                    
+                    // Hapus gambar lama jika ada
+                    $oldSetting = SiteSetting::where('key', $key)->first();
+                    if ($oldSetting && $oldSetting->value) {
+                        $oldImagePath = public_path($oldSetting->value);
+                        if (file_exists($oldImagePath)) {
+                            unlink($oldImagePath);
+                        }
+                    }
+
+                    // Simpan gambar baru
+                    $image->move(public_path('images'), $imageName);
+
+                    // Simpan ke database
+                    SiteSetting::updateOrCreate(
+                        ['key' => $key],
+                        ['value' => 'images/' . $imageName]
+                    );
+
+                    $updatedImages[$key] = [
+                        'url' => 'images/' . $imageName,
+                        'full_url' => asset('images/' . $imageName)
+                    ];
+                }
+            }
+
+            return response()->json([
+                'message' => 'Survey images updated successfully',
+                'updated_images' => $updatedImages
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error updating survey images: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateProdukImages(Request $request)
+    {
+        try {
+            // Log incoming request for debugging
+            \Log::info('Produk images upload request', [
+                'has_files' => $request->allFiles(),
+                'user_id' => $request->user()?->id,
+                'content_type' => $request->header('Content-Type')
+            ]);
+
+            $request->validate([
+                'produk_image_1' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'produk_image_2' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'produk_image_3' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'produk_image_4' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ]);
+
+            $updatedImages = [];
+
+            // Ensure images directory exists
+            $imagesPath = public_path('images');
+            if (!file_exists($imagesPath)) {
+                mkdir($imagesPath, 0755, true);
+                \Log::info('Created images directory', ['path' => $imagesPath]);
+            }
+
+            for ($i = 1; $i <= 4; $i++) {
+                $key = "produk_image_{$i}";
+                
+                if ($request->hasFile($key)) {
+                    $image = $request->file($key);
+                    
+                    \Log::info('Processing image', [
+                        'key' => $key,
+                        'original_name' => $image->getClientOriginalName(),
+                        'size' => $image->getSize(),
+                        'mime_type' => $image->getMimeType()
+                    ]);
+                    
+                    $imageName = time() . "_produk_{$i}." . $image->getClientOriginalExtension();
+                    
+                    // Hapus gambar lama jika ada
+                    $oldSetting = SiteSetting::where('key', $key)->first();
+                    if ($oldSetting && $oldSetting->value) {
+                        $oldImagePath = public_path($oldSetting->value);
+                        if (file_exists($oldImagePath)) {
+                            unlink($oldImagePath);
+                            \Log::info('Deleted old image', ['path' => $oldImagePath]);
+                        }
+                    }
+
+                    // Simpan gambar baru
+                    $image->move($imagesPath, $imageName);
+                    \Log::info('Saved new image', ['path' => $imagesPath . '/' . $imageName]);
+
+                    // Simpan ke database
+                    SiteSetting::updateOrCreate(
+                        ['key' => $key],
+                        ['value' => 'images/' . $imageName]
+                    );
+
+                    $updatedImages[$key] = [
+                        'url' => 'images/' . $imageName,
+                        'full_url' => asset('images/' . $imageName)
+                    ];
+                    
+                    \Log::info('Updated image record', ['key' => $key, 'url' => 'images/' . $imageName]);
+                }
+            }
+
+            \Log::info('Produk images update completed', ['updated_count' => count($updatedImages)]);
+
+            return response()->json([
+                'message' => 'Produk images updated successfully',
+                'updated_images' => $updatedImages
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed for produk images', [
+                'errors' => $e->errors(),
+                'request_data' => $request->all()
+            ]);
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating produk images', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Error updating produk images: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

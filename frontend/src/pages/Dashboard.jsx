@@ -20,7 +20,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const isPsikolog = user?.status_pengguna === "Psikolog";
-  const registeredName = (user?.name || user?.nama || "").trim() || "Teman";
+  const registeredName = (user?.name || user?.nama || "").trim() || "User";
 
   useEffect(() => {
     document.title = "Patnal Integrity Hub- Dashboard";
@@ -36,8 +36,11 @@ export default function Dashboard() {
 
   const fetchUser = async () => {
     try {
-      const response = await api.get("/api/user");
+      const response = await api.get("/user");
       const currentUser = response.data;
+      console.log("User data from API:", currentUser);
+      console.log("User name:", currentUser?.name);
+      console.log("User nama:", currentUser?.nama);
       if (currentUser?.status_pengguna === "Admin") {
         navigate("/admin/dashboard");
         return;
@@ -51,7 +54,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     try {
-      await api.post("/api/logout");
+      await api.post("/logout");
       // Clear the stored token
       localStorage.removeItem("auth_token");
       delete api.defaults.headers.common["Authorization"];
@@ -98,13 +101,23 @@ export default function Dashboard() {
                   <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
                   Dashboard
                 </a>
-                <a
-                  href="/consultation"
-                  className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
-                >
-                  <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                  Konsultasi
-                </a>
+                {isPsikolog ? (
+                  <a
+                    href="/consultation?type=psikolog"
+                    className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
+                  >
+                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                    Konsultasi Psikolog
+                  </a>
+                ) : (
+                  <a
+                    href="/consultation?type=teknis"
+                    className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
+                  >
+                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                    Konsultasi Teknis
+                  </a>
+                )}
                 {isPsikolog && (
                   <a
                     href="/reports"
@@ -175,13 +188,13 @@ export default function Dashboard() {
                 {/* Konsultasi / Assessment */}
                 <a
                   href="/consultation"
-                  className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-5"
+                  className="group relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/70 p-5 shadow-sm ring-1 ring-blue-100/80 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg transition-all duration-200"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex min-h-[108px] items-start gap-4">
                     <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 transition-colors">
                       <HeartHandshake className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
                     </div>
-                    <div>
+                    <div className="pr-8">
                       <h4 className="font-semibold text-gray-800 text-sm">{isPsikolog ? "Assessment" : "Konsultasi"}</h4>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {isPsikolog ? "Kelola sesi assessment klien" : "Mulai sesi konsultasi baru"}
@@ -194,13 +207,13 @@ export default function Dashboard() {
                 {/* Riwayat */}
                 <a
                   href="/consultation"
-                  className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-5"
+                  className="group relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/70 p-5 shadow-sm ring-1 ring-indigo-100/80 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg transition-all duration-200"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex min-h-[108px] items-start gap-4">
                     <div className="w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 transition-colors">
                       <History className="w-5 h-5 text-indigo-600 group-hover:text-white transition-colors" />
                     </div>
-                    <div>
+                    <div className="pr-8">
                       <h4 className="font-semibold text-gray-800 text-sm">
                         {isPsikolog ? "Riwayat Assessment" : "Riwayat Konsultasi"}
                       </h4>
@@ -215,13 +228,7 @@ export default function Dashboard() {
             </div>
 
             {/* WBS sementara di-hide, tidak dihapus */}
-            {false && (
-              <WBSProgress wbsProgress={[
-                { nomor: "WBS-001", status: "Ditinjau" },
-                { nomor: "WBS-002", status: "Ditindaklanjuti" },
-                { nomor: "WBS-003", status: "Ditinjau" },
-              ]} />
-            )}
+            {/* {WBSProgress} (sementara dinonaktifkan) */}
           </main>
         </div>
       </div>

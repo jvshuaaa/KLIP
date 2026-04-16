@@ -11,14 +11,16 @@ use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\SiteSettingController;
+use App\Http\Controllers\Api\SurveyController;
 use App\Http\Controllers\AuthWebController;
+use App\Http\Controllers\Admin\UserApprovalController;
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthWebController::class, 'register']);
+Route::post('/login', [AuthWebController::class, 'login'])->name('api.login');
+Route::post('/register', [AuthWebController::class, 'register'])->name('api.register');
 
 // password reset endpoints
-Route::post('/forgot-password', [ForgotPasswordController::class, 'sendLink']);
-Route::post('/reset-password',   [ResetPasswordController::class, 'reset']);
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendLink'])->name('api.forgot-password');
+Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name('api.reset-password');
 
 // Public documents endpoint (published documents only)
 Route::get('/documents', [DocumentController::class, 'index']);
@@ -28,9 +30,12 @@ Route::get('/documents/{id}', [DocumentController::class, 'show']);
 Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/site-settings', [SiteSettingController::class, 'index']);
 
+// Public survey endpoint
+Route::post('/survey', [SurveyController::class, 'store']);
+
 // Authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/logout', [AuthWebController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/update-password', [AuthController::class, 'updatePassword']);
     Route::put('/profile/update', [AuthController::class, 'updateProfile']);
@@ -62,19 +67,48 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/consultations/{id}', [ConsultationController::class, 'destroy']); // Delete consultation
 
     // Admin user management
-    Route::get('/admin/users', [AdminUserController::class, 'index']);
-    Route::post('/admin/users', [AdminUserController::class, 'store']);
-    Route::put('/admin/users/{id}', [AdminUserController::class, 'update']);
-    Route::delete('/admin/users/{id}', [AdminUserController::class, 'destroy']);
+    Route::get('/admin/users', [AdminUserController::class, 'index'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/users', [AdminUserController::class, 'store'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::put('/admin/users/{id}', [AdminUserController::class, 'update'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::delete('/admin/users/{id}', [AdminUserController::class, 'destroy'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+
+    // User approval management
+    Route::get('/admin/users/pending', [UserApprovalController::class, 'index'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/users/{id}/approve', [UserApprovalController::class, 'approve'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/users/{id}/reject', [UserApprovalController::class, 'reject'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::get('/admin/users/all', [UserApprovalController::class, 'getAllUsers'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
 
     // Admin banner management
-    Route::get('/admin/banners', [BannerController::class, 'adminIndex']);
-    Route::post('/admin/banners', [BannerController::class, 'store']);
-    Route::post('/admin/banners/{id}', [BannerController::class, 'update']);
-    Route::delete('/admin/banners/{id}', [BannerController::class, 'destroy']);
+    Route::get('/admin/banners', [BannerController::class, 'adminIndex'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/banners', [BannerController::class, 'store'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/banners/{id}', [BannerController::class, 'update'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::delete('/admin/banners/{id}', [BannerController::class, 'destroy'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
 
-    // Admin site settings (images)
-    Route::post('/admin/site-settings/{key}', [SiteSettingController::class, 'update']);
+    // Admin site settings (images) - using inline middleware for now
+    Route::post('/admin/site-settings/{key}', [SiteSettingController::class, 'update'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/survey-images', [SiteSettingController::class, 'updateSurveyImages'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::post('/admin/produk-images', [SiteSettingController::class, 'updateProdukImages'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+
+    // Admin survey management
+    Route::get('/admin/surveys', [SurveyController::class, 'index'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
+    Route::get('/admin/surveys/statistics', [SurveyController::class, 'statistics'])
+        ->middleware(\App\Http\Middleware\AdminMiddleware::class);
 
     // Real-time chat (per consultation room)
     Route::get('/chat/stats', [ChatController::class, 'stats']);

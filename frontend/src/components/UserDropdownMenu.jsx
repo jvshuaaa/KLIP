@@ -32,7 +32,7 @@ export default function UserDropdownMenu({ user, onLogout, onUserUpdate }) {
     const nextValue = !isAvailable;
     try {
       setSavingAvailability(true);
-      const response = await api.put("/api/consultations/psychologists/availability", {
+      const response = await api.put("/consultations/psychologists/availability", {
         is_available: nextValue,
       });
 

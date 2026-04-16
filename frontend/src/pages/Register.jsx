@@ -78,6 +78,13 @@ export default function Register() {
     'Sumatera Utara',
   ];
 
+  const pangkatGolonganOptions = [
+    'Ia', 'Ib', 'Ic', 'Id', 'Ie',
+    'IIa', 'IIb', 'IIc', 'IId', 'IIe',
+    'IIIa', 'IIIb', 'IIIc', 'IIId', 'IIIe',
+    'IVa', 'IVb', 'IVc', 'IVd', 'IVe',
+  ];
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'daftar_sebagai') {
@@ -148,7 +155,7 @@ export default function Register() {
         password_confirmation: '***'
       });
       
-      const response = await api.post('/api/register', formData);
+      const response = await api.post('/register', formData);
       console.log('Registration successful:', response.data);
       
       setSuccess(true);
@@ -427,15 +434,20 @@ export default function Register() {
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Pangkat/Golongan <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="pangkat_golongan"
                         value={formData.pangkat_golongan}
                         onChange={handleChange}
-                        placeholder="Contoh: Penata / III-C"
                         required
-                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      />
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white"
+                      >
+                        <option value="">-- Pilih Pangkat/Golongan --</option>
+                        {pangkatGolonganOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Jabatan */}
@@ -662,4 +674,3 @@ export default function Register() {
     </div>
   );
 }
-
