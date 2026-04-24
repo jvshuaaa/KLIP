@@ -105,9 +105,13 @@ const AdminSurvey = () => {
     const totalDistribution = {};
     for (let i = 1; i <= 5; i++) {
       totalDistribution[i] = 0;
-      Object.values(statistics.distribution[i]).forEach(count => {
-        totalDistribution[i] += count;
-      });
+      // Check if distribution[i] exists before Object.values
+      const dist = statistics.distribution[i];
+      if (dist && typeof dist === 'object') {
+        Object.values(dist).forEach(count => {
+          totalDistribution[i] += count || 0;
+        });
+      }
     }
     
     return Object.entries(totalDistribution).map(([rating, count]) => ({
@@ -200,8 +204,15 @@ const AdminSurvey = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Survey Kepuasan</h1>
-              <p className="text-gray-600 mt-1">Analisis hasil survey kepuasan pengguna</p>
+              <div className="flex items-center gap-3 mb-2">
+                <a href="/admin/dashboard" className="flex items-center gap-3 hover:opacity-80 transition">
+                  <h1 className="text-3xl font-bold text-gray-900">PATNAL</h1>
+                  <span className="text-2xl font-light text-gray-300">|</span>
+                  <span className="text-2xl font-semibold text-blue-600">Integrity Hub</span>
+                </a>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800">Survey Kepuasan</h2>
+              <p className="text-gray-500 text-sm mt-1">Analisis hasil survey kepuasan pengguna</p>
             </div>
             <button
               onClick={exportToCSV}

@@ -22,7 +22,6 @@ export default function Banner() {
     fetch(`${API_URL}/banners`)
       .then((r) => r.json())
       .then((data) => {
-        console.log('Banner API response:', data);
         if (Array.isArray(data) && data.length > 0) {
           // Konversi ke relative path agar lewat Vite proxy (hindari CORS)
           const toRelative = (url) => {
@@ -34,11 +33,9 @@ export default function Banner() {
             }
           };
           const banners = data.map((b) => toRelative(b.image_url));
-          console.log('Banner images from API:', banners);
-          setApiBanners(banners);
+            setApiBanners(banners);
         } else {
-          console.log('No API banners, using static:', STATIC_IMAGES);
-          setApiBanners([]); // empty → use static
+                    setApiBanners([]); // empty → use static
         }
       })
       .catch((err) => {
@@ -62,10 +59,18 @@ export default function Banner() {
     return clones;
   }, [images]);
 
-  // Debug index changes (moved after slides declaration)
+  const activeDotIndex = useMemo(() => {
+    if (images.length === 0) return 0;
+    if (index <= 0) return images.length - 1;
+    if (index > images.length) return 0;
+    return index - 1;
+  }, [images.length, index]);
+
   useEffect(() => {
-    console.log('Banner index:', index, 'of', slides.length, 'slides');
-  }, [index, slides]);
+    if (images.length > 0) {
+      setIndex(1);
+    }
+  }, [images.length]);
 
   useEffect(() => {
     if (slides.length === 0) return;
@@ -160,10 +165,8 @@ export default function Banner() {
     if (!slider) return;
 
     const handleTransitionEnd = () => {
-      console.log('Banner transitionEnd fired, index:', index, 'slides.length:', slides.length);
       setTransitioning(false);
-      if (index >= slides.length - 2) {
-        console.log('Banner: resetting to start (infinite loop)');
+      if (index > images.length) {
         slider.style.transition = "none";
         setIndex(1);
         slider.style.transform = `translateX(-${getSlideWidth()}px)`;
@@ -172,11 +175,10 @@ export default function Banner() {
             slider.style.transition = "transform 1s ease-in-out";
           })
         );
-      } else if (index <= 0) {
-        console.log('Banner: resetting to end (infinite loop)');
+      } else if (index < 1) {
         slider.style.transition = "none";
-        setIndex(slides.length - 3);
-        slider.style.transform = `translateX(-${getSlideWidth() * (slides.length - 3)}px)`;
+        setIndex(images.length);
+        slider.style.transform = `translateX(-${getSlideWidth() * images.length}px)`;
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             slider.style.transition = "transform 1s ease-in-out";
@@ -186,9 +188,19 @@ export default function Banner() {
     };
 
     slider.addEventListener("transitionend", handleTransitionEnd);
-    return () =>
+    
+    // Fallback: reset transitioning after 2.5s if transitionend doesn't fire
+    const fallbackTimeout = setTimeout(() => {
+      if (transitioning) {
+        setTransitioning(false);
+      }
+    }, 2500);
+    
+    return () => {
       slider.removeEventListener("transitionend", handleTransitionEnd);
-  }, [index, slides.length, getSlideWidth]);
+      clearTimeout(fallbackTimeout);
+    };
+  }, [getSlideWidth, images.length, index, transitioning]);
 
   useEffect(() => {
     moveToSlide(index, true);
@@ -269,7 +281,7 @@ export default function Banner() {
               <button
                 key={i}
                 className={`dot size-2 rounded-full ${
-                  i + 1 === index ? "bg-blue-600" : "bg-blue-300"
+                  i === activeDotIndex ? "bg-blue-600" : "bg-blue-300"
                 }`}
                 onClick={() => goToSlide(i + 1)}
               />

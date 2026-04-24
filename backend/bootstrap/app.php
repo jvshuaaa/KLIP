@@ -15,7 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->group('api', [
             \Illuminate\Http\Middleware\ValidatePostSize::class,
             \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
         
         // 1. TAMBAHKAN INI: Agar Laravel mengenali HTTPS dari Load Balancer Railway
@@ -27,8 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Exclude CSRF only for public auth and password reset endpoints.
-        // API bearer-token calls do not use CSRF, while stateful web session routes remain protected.
+        // Exclude CSRF only for public auth, password reset, and broadcast auth.
+        // This app authenticates API requests with bearer tokens, so API routes stay stateless.
         $middleware->validateCsrfTokens(except: [
             'api/login',
             'api/register',

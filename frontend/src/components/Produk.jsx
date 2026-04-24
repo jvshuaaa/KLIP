@@ -19,20 +19,9 @@ export default function Produk() {
   }, []);
 
   useEffect(() => {
-    console.log('Fetching site settings from:', `${API_BASE}/site-settings`);
     fetch(`${API_BASE}/site-settings`)
-      .then((r) => {
-        console.log('Site settings response status:', r.status);
-        return r.json();
-      })
+      .then((r) => r.json())
       .then((data) => {
-        console.log('Site settings data:', data);
-        console.log('Produk images from API:', {
-          produk_image_1: data.produk_image_1,
-          produk_image_2: data.produk_image_2,
-          produk_image_3: data.produk_image_3,
-          produk_image_4: data.produk_image_4
-        });
         setSiteImages(data);
       })
       .catch((error) => {

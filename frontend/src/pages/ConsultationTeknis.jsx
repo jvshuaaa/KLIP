@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/axios';
-import UserDropdownMenu from '../components/UserDropdownMenu';
 import { LayoutDashboard, ClipboardList, FileBarChart2, Plus, History, MessageSquare, Home, CheckCircle, X, UserCheck, Settings, FileText, Send, Building2 } from 'lucide-react';
 
 export default function ConsultationTeknis() {
@@ -194,7 +193,11 @@ export default function ConsultationTeknis() {
                   Layanan konsultasi teknis untuk kepatuhan dan regulasi internal dengan pendekatan modern.
                 </p>
               </div>
-              <UserDropdownMenu user={user} onLogout={handleLogout} />
+              <a href="/dashboard" className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-xl transition">
+                <span className="font-bold text-white text-lg">PATNAL</span>
+                <span className="text-white/60">|</span>
+                <span className="text-indigo-200 font-semibold">Integrity Hub</span>
+              </a>
             </div>
           </div>
 
@@ -338,13 +341,16 @@ export default function ConsultationTeknis() {
                   <p className="text-sm text-gray-600 leading-relaxed group-hover:text-gray-700 transition-colors">Lihat dan lanjutkan chat konsultasi teknis Anda dengan konsultan PATNAL.</p>
                 </a>
 
-                <a href="/dashboard" className="group text-left bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 border-2 border-emerald-200/50 rounded-3xl shadow-lg hover:shadow-xl hover:border-emerald-300 hover:scale-105 transition-all duration-300 p-8 overflow-hidden relative h-full xl:col-span-2 xl:max-w-md">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-200/40 to-green-200/40 rounded-bl-full opacity-80 group-hover:opacity-100 transition-opacity" />
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                    <Home className="w-8 h-8 text-white" />
+                <a href="/dashboard" className="group text-left bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-2 border-indigo-200/50 rounded-3xl shadow-lg hover:shadow-xl hover:border-indigo-300 hover:scale-105 transition-all duration-300 p-8 overflow-hidden relative h-full xl:col-span-2 xl:max-w-md">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-200/40 to-purple-200/40 rounded-bl-full opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <h3 className="font-bold text-gray-800 text-2xl">PATNAL</h3>
+                      <span className="text-xl font-light text-gray-400">|</span>
+                      <span className="text-xl font-semibold text-indigo-600">Integrity Hub</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed group-hover:text-gray-700 transition-colors">Kembali ke dashboard utama.</p>
                   </div>
-                  <p className="font-bold text-gray-800 text-xl mb-3 group-hover:text-emerald-700 transition-colors">Kembali ke Dashboard</p>
-                  <p className="text-sm text-gray-600 leading-relaxed group-hover:text-gray-700 transition-colors">Kembali ke ringkasan fitur dan progres integritas Anda dengan tampilan yang intuitif.</p>
                 </a>
               </div>
             )}

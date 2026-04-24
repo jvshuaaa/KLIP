@@ -1,23 +1,33 @@
 import Pusher from 'pusher-js';
-import api from './axios';
+import axios from 'axios';
 
 /**
  * Creates a Pusher instance configured for private-channel auth
  * via the Laravel /broadcasting/auth endpoint.
  *
- * Using a custom authorizer so that the current auth token from
- * axios (which handles token refresh) is always used.
+ * Using a custom authorizer so that the current bearer token
+ * is always sent to the backend broadcast auth route.
  */
 function createPusher() {
+  const authURL = '/broadcasting/auth';
+
   return new Pusher(import.meta.env.VITE_PUSHER_APP_KEY, {
     cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'ap1',
     forceTLS: true,
     authorizer: (channel) => ({
       authorize: (socketId, callback) => {
-        api
-          .post('/broadcasting/auth', {
+        axios
+          .post(authURL, {
             socket_id: socketId,
             channel_name: channel.name,
+          }, {
+            headers: {
+              Accept: 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              ...(localStorage.getItem('auth_token')
+                ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
+                : {}),
+            },
           })
           .then(({ data }) => callback(null, data))
           .catch((err) => callback(err, null));

@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import Logo from "../components/Logo";
+import AdminConsultationSection from "../components/admin/AdminConsultationSection";
+import AdminDashboardMenu from "../components/admin/AdminDashboardMenu";
+import AdminDocumentsSection from "../components/admin/AdminDocumentsSection";
+import AdminPendingUsersSection from "../components/admin/AdminPendingUsersSection";
+import AdminUsersSection from "../components/admin/AdminUsersSection";
 
 const categoryOptions = {
   peraturan: [
@@ -776,63 +781,136 @@ export default function AdminDashboard() {
           </div>
 
           {view === "menu" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <AdminDashboardMenu
+              consultationsCount={consultations.length}
+              usersCount={users.length}
+              documentsCount={documents.length}
+              psychologistCount={
+                users.filter(
+                  (user) => (user.status_pengguna || user.daftar_sebagai) === "Psikolog"
+                ).length
+              }
+              onOpenConsultation={() => {
+                fetchAdminData();
+                handleViewChange("consultation");
+              }}
+              onOpenUsers={() => {
+                fetchAdminData();
+                handleViewChange("users");
+              }}
+              onOpenDocuments={() => {
+                fetchAdminData();
+                handleViewChange("documents");
+              }}
+              onOpenSurvey={() => {
+                fetchAdminData();
+                handleViewChange("survey");
+              }}
+              onOpenProdukImages={() => {
+                fetchAdminData();
+                handleViewChange("produk_images");
+              }}
+              onOpenPsychologistPhotos={() => {
+                fetchAdminData();
+                handleViewChange("psychologist_photos");
+              }}
+              onOpenBanners={() => {
+                fetchBanners();
+                handleViewChange("banners");
+              }}
+              onOpenLogos={() => {
+                fetchAdminData();
+                handleViewChange("logos");
+              }}
+              onOpenKasubditPhotos={() => handleViewChange("kasubdit_photos")}
+            />
+          )}
+
+          {false && view === "menu" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {/* Monitoring Konsultasi */}
               <button
                 onClick={() => { fetchAdminData(); handleViewChange("consultation"); }}
-                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 p-5 overflow-hidden relative"
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-blue-300 transition-all duration-300 p-6 overflow-hidden relative"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full opacity-70" />
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
-                  <ClipboardList className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-bl-full opacity-60 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-200 group-hover:shadow-blue-300 transition-shadow">
+                    <ClipboardList className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-base mb-2">Monitoring Konsultasi</p>
+                  <p className="text-sm text-gray-500 mb-4">Lihat semua sesi konsultasi yang aktif.</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">{consultations.length} sesi</span>
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  </div>
                 </div>
-                <p className="font-semibold text-gray-800 text-sm mb-1">Monitoring Konsultasi</p>
-                <p className="text-xs text-gray-500 mb-3">Lihat semua sesi konsultasi yang aktif.</p>
-                <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Total: {consultations.length} sesi</span>
               </button>
 
               {/* Manajemen User */}
               <button
                 onClick={() => { fetchAdminData(); handleViewChange("users"); }}
-                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-200 p-5 overflow-hidden relative"
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-green-300 transition-all duration-300 p-6 overflow-hidden relative"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-green-50 rounded-bl-full opacity-70" />
-                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-600 transition-colors">
-                  <Users className="w-5 h-5 text-green-600 group-hover:text-white transition-colors" />
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-100 to-green-200 rounded-bl-full opacity-60 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mb-4 shadow-lg shadow-green-200 group-hover:shadow-green-300 transition-shadow">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-base mb-2">Manajemen User</p>
+                  <p className="text-sm text-gray-500 mb-4">Tambah, edit, dan hapus user.</p>
+                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full font-semibold">{users.length} user</span>
                 </div>
-                <p className="font-semibold text-gray-800 text-sm mb-1">Manajemen User</p>
-                <p className="text-xs text-gray-500 mb-3">Tambah, edit, dan hapus user.</p>
-                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Total: {users.length} user</span>
               </button>
 
               {/* Manajemen Dokumen */}
               <button
                 onClick={() => { fetchAdminData(); handleViewChange("documents"); }}
-                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all duration-200 p-5 overflow-hidden relative"
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-orange-300 transition-all duration-300 p-6 overflow-hidden relative"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-orange-50 rounded-bl-full opacity-70" />
-                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-600 transition-colors">
-                  <BookOpen className="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" />
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-100 to-orange-200 rounded-bl-full opacity-60 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mb-4 shadow-lg shadow-orange-200 group-hover:shadow-orange-300 transition-shadow">
+                    <BookOpen className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-base mb-2">Manajemen Dokumen</p>
+                  <p className="text-sm text-gray-500 mb-4">Upload dan kelola dokumen PDF.</p>
+                  <span className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1 rounded-full font-semibold">{documents.length} dokumen</span>
                 </div>
-                <p className="font-semibold text-gray-800 text-sm mb-1">Manajemen Dokumen</p>
-                <p className="text-xs text-gray-500 mb-3">Upload dan kelola dokumen PDF.</p>
-                <span className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full font-medium">Total: {documents.length} dokumen</span>
               </button>
+
+              {/* Pengaduan - NEW */}
+              <a
+                href="/admin/pengaduan"
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-purple-300 transition-all duration-300 p-6 overflow-hidden relative"
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-100 to-purple-200 rounded-bl-full opacity-60 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-200 group-hover:shadow-purple-300 transition-shadow">
+                    <Shield className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-base mb-2">Manajemen Pengaduan</p>
+                  <p className="text-sm text-gray-500 mb-4">Lihat dan proses pengaduan pegawai.</p>
+                  <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1 rounded-full font-semibold">Kelola Pengaduan</span>
+                </div>
+              </a>
 
               {/* Survey Kepuasan */}
               <button
                 onClick={() => { fetchAdminData(); handleViewChange("survey"); }}
-                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 p-5 overflow-hidden relative"
+                className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-pink-300 transition-all duration-300 p-6 overflow-hidden relative"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full opacity-70" />
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
-                  <Star className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
-                </div>
-                <p className="font-semibold text-gray-800 text-sm mb-1">Survey Kepuasan</p>
-                <p className="text-xs text-gray-500 mb-3">Lihat hasil dan analisis survey kepuasan pengguna.</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Analytics</span>
-                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">Export</span>
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-pink-100 to-pink-200 rounded-bl-full opacity-60 group-hover:scale-110 transition-transform duration-500" />
+                <div className="relative z-10">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center mb-4 shadow-lg shadow-pink-200 group-hover:shadow-pink-300 transition-shadow">
+                    <Star className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-base mb-2">Survey Kepuasan</p>
+                  <p className="text-sm text-gray-500 mb-4">Lihat hasil dan analisis survey kepuasan pengguna.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs bg-pink-50 text-pink-700 border border-pink-200 px-2.5 py-1 rounded-full font-semibold">Analytics</span>
+                    <span className="text-xs bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-full font-semibold">Export</span>
+                  </div>
                 </div>
               </button>
 
@@ -913,6 +991,13 @@ export default function AdminDashboard() {
 
           {/* VIEWS */}
           {view === "consultation" && (
+            <AdminConsultationSection
+              consultations={consultations}
+              onBack={() => handleViewChange("menu")}
+            />
+          )}
+
+          {false && view === "consultation" && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -958,6 +1043,32 @@ export default function AdminDashboard() {
           )}
 
           {view === "users" && (
+            <AdminUsersSection
+              users={users}
+              userFormOpen={userFormOpen}
+              editingUserId={editingUserId}
+              userForm={userForm}
+              userSubmitting={userSubmitting}
+              onOpenAddUser={() => {
+                resetUserForm();
+                setUserFormOpen(true);
+              }}
+              onOpenPendingUsers={() => handleViewChange("pending_users")}
+              onBack={() => handleViewChange("menu")}
+              onApproveUser={handleApproveUser}
+              onRejectUser={handleRejectUser}
+              onEditUser={openEditUser}
+              onDeleteUser={handleDeleteUser}
+              onCloseForm={() => {
+                setUserFormOpen(false);
+                resetUserForm();
+              }}
+              onUserFormChange={handleUserFormChange}
+              onUserSubmit={handleUserSubmit}
+            />
+          )}
+
+          {false && view === "users" && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -1245,6 +1356,15 @@ export default function AdminDashboard() {
           )}
 
           {view === "pending_users" && (
+            <AdminPendingUsersSection
+              users={users}
+              onBack={() => handleViewChange("users")}
+              onApproveUser={handleApproveUser}
+              onRejectUser={handleRejectUser}
+            />
+          )}
+
+          {false && view === "pending_users" && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -1315,6 +1435,34 @@ export default function AdminDashboard() {
           )}
 
           {view === "documents" && (
+            <AdminDocumentsSection
+              documents={documents}
+              docSearchTerm={docSearchTerm}
+              onSearchTermChange={(e) => setDocSearchTerm(e.target.value)}
+              onOpenAdd={() => {
+                resetDocForm();
+                setDocFormOpen(true);
+              }}
+              onBack={() => handleViewChange("menu")}
+              onEditDoc={openEditDoc}
+              onDeleteDoc={handleDeleteDoc}
+              docFormOpen={docFormOpen}
+              editingDocId={editingDocId}
+              docForm={docForm}
+              docSubmitting={docSubmitting}
+              docUploadFile={docUploadFile}
+              categoryOptions={categoryOptions}
+              onDocFormChange={handleDocFormChange}
+              onDocSubmit={handleDocSubmit}
+              onCloseForm={() => {
+                setDocFormOpen(false);
+                resetDocForm();
+              }}
+              onFileSelected={(file) => setDocUploadFile(file)}
+            />
+          )}
+
+          {false && view === "documents" && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">

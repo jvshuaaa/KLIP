@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Storage;
 
 class BannerController extends Controller
 {
+    private const PUBLIC_BANNER_LIMIT = 4;
+
     private function isAdmin($user): bool
     {
         return $user && (
@@ -22,6 +24,7 @@ class BannerController extends Controller
     {
         $banners = Banner::where('is_active', true)
             ->orderBy('order')
+            ->limit(self::PUBLIC_BANNER_LIMIT)
             ->get()
             ->map(fn($b) => [
                 'id'        => $b->id,

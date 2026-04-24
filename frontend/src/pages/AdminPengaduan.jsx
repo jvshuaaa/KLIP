@@ -16,13 +16,38 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 
 const STATUS_COLORS = {
-  pending: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Pending" },
-  diproses: { bg: "bg-blue-100", text: "text-blue-700", label: "Diproses" },
-  selesai: { bg: "bg-green-100", text: "text-green-700", label: "Selesai" },
-  ditolak: { bg: "bg-red-100", text: "text-red-700", label: "Ditolak" },
+  pending: { 
+    bg: "bg-gradient-to-br from-amber-400 to-orange-500", 
+    text: "text-white", 
+    label: "Pending",
+    iconBg: "bg-amber-100",
+    iconColor: "text-amber-600"
+  },
+  diproses: { 
+    bg: "bg-gradient-to-br from-blue-400 to-indigo-500", 
+    text: "text-white", 
+    label: "Diproses",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600"
+  },
+  selesai: { 
+    bg: "bg-gradient-to-br from-emerald-400 to-teal-500", 
+    text: "text-white", 
+    label: "Selesai",
+    iconBg: "bg-emerald-100",
+    iconColor: "text-emerald-600"
+  },
+  ditolak: { 
+    bg: "bg-gradient-to-br from-rose-400 to-pink-500", 
+    text: "text-white", 
+    label: "Ditolak",
+    iconBg: "bg-rose-100",
+    iconColor: "text-rose-600"
+  },
 };
 
 const KATEGORI_LABELS = {
@@ -149,34 +174,76 @@ export default function AdminPengaduan() {
               </div>
             )}
 
-            {/* Stats */}
+            {/* Stats Cards - Modern Design */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {Object.entries(STATUS_COLORS).map(([key, colors]) => {
                 const count = pengaduans.filter((p) => p.status === key).length;
+                const total = pengaduans.length;
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                
                 return (
                   <div
                     key={key}
-                    className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"
+                    className="group relative bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden"
                   >
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
-                      {key === "pending" && <Clock className="w-3.5 h-3.5" />}
-                      {key === "diproses" && <FileText className="w-3.5 h-3.5" />}
-                      {key === "selesai" && <CheckCircle className="w-3.5 h-3.5" />}
-                      {key === "ditolak" && <XCircle className="w-3.5 h-3.5" />}
-                      {colors.label}
+                    {/* Background Decoration */}
+                    <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 ${colors.bg}`}></div>
+                    
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`p-2.5 rounded-xl ${colors.iconBg}`}>
+                          {key === "pending" && <Clock className={`w-5 h-5 ${colors.iconColor}`} />}
+                          {key === "diproses" && <FileText className={`w-5 h-5 ${colors.iconColor}`} />}
+                          {key === "selesai" && <CheckCircle className={`w-5 h-5 ${colors.iconColor}`} />}
+                          {key === "ditolak" && <XCircle className={`w-5 h-5 ${colors.iconColor}`} />}
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${colors.bg} ${colors.text}`}>
+                          {colors.label}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-end gap-2">
+                        <p className="text-3xl font-bold text-gray-800">{count}</p>
+                        <p className="text-sm text-gray-500 mb-1">pengaduan</p>
+                      </div>
+                      
+                      {/* Progress Bar */}
+                      <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${colors.bg}`}
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1.5">{percentage}% dari total</p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-800 mt-2">{count}</p>
                   </div>
                 );
               })}
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Daftar Pengaduan
-                </h2>
+            {/* Modern Table */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 rounded-lg">
+                    <Shield className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800">
+                      Daftar Pengaduan
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      {pengaduans.length} pengaduan ditemukan
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={fetchPengaduans}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-600 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
               </div>
 
               {pengaduans.length === 0 ? (

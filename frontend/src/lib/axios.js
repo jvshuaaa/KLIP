@@ -15,14 +15,15 @@ const api = axios.create({
 // Use Bearer token auth for API requests (no cookie-based session required)
 api.defaults.withCredentials = false;
 
-// Add bearer token to every request if it exists in localStorage
+// Add bearer token and API headers to every request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    console.warn('No auth_token found in localStorage for request:', config.url);
   }
+  // Ensure Laravel treats this as API request (not web)
+  config.headers.Accept = 'application/json';
+  config.headers['X-Requested-With'] = 'XMLHttpRequest';
 
   // Debug: log token untuk chat dan admin pengaduan endpoint
   if (config.url?.includes('/chat/') || config.url?.includes('/admin/pengaduan')) {
