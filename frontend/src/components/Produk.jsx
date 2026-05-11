@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+import api from "../lib/axios";
 
 export default function Produk() {
   const [role, setRole] = useState(null);
@@ -19,13 +18,13 @@ export default function Produk() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE}/site-settings`)
-      .then((r) => r.json())
-      .then((data) => {
-        setSiteImages(data);
+    api
+      .get("/site-settings")
+      .then((res) => {
+        setSiteImages(res?.data || {});
       })
       .catch((error) => {
-        console.error('Error fetching site settings:', error);
+        console.error("Error fetching site settings:", error);
         /* keep defaults */
       });
   }, []);

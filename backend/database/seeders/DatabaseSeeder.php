@@ -69,5 +69,8 @@ class DatabaseSeeder extends Seeder
                 'status_pengguna' => 'User',
             ]
         );
+
+        // Seed documents and regulations
+        $this->call(DocumentSeeder::class);
     }
 }

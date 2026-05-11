@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import api from "../lib/axios";
 
 const STATIC_IMAGES = [
   "/images/banner/1.png",
   "/images/banner/2.png",
   "/images/banner/3.png",
 ];
-
-// VITE_API_URL: "/api" (Vite proxy) atau "http://localhost:8000/api" (absolute)
-const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export default function Banner() {
   const sliderRef = useRef(null);
@@ -19,9 +17,10 @@ export default function Banner() {
 
   // Fetch banners from API
   useEffect(() => {
-    fetch(`${API_URL}/banners`)
-      .then((r) => r.json())
-      .then((data) => {
+    api
+      .get("/banners")
+      .then((res) => {
+        const data = res?.data;
         if (Array.isArray(data) && data.length > 0) {
           // Konversi ke relative path agar lewat Vite proxy (hindari CORS)
           const toRelative = (url) => {

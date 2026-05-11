@@ -4,11 +4,29 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use App\Models\SiteSetting;
 
 class DocumentSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seed default site settings for logos
+        SiteSetting::updateOrCreate(
+            ['key' => 'home_logo'],
+            ['value' => '/images/home_logo.png']
+        );
+        SiteSetting::updateOrCreate(
+            ['key' => 'login_logo_kemenkumham'],
+            ['value' => '/images/login_logo_kemenkumham.png']
+        );
+        SiteSetting::updateOrCreate(
+            ['key' => 'login_logo_ditjen'],
+            ['value' => '/images/login_logo_ditjen.png']
+        );
+        SiteSetting::updateOrCreate(
+            ['key' => 'app_name'],
+            ['value' => 'PATNAL Integrity Hub']
+        );
         $adminId = DB::table('users')->where('status_pengguna', 'Admin')->value('id') ?? 1;
         $now = now();
 

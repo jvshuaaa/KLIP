@@ -11,12 +11,24 @@ class AuthWebController extends Controller
 {
     public function login(Request $request)
     {
+        // Frontend implementations vary: some send `nip`, others send `email`,
+        // or a generic `identifier` / `username`. Accept them all to avoid 422
+        // validation errors when the payload key differs.
         $credentials = $request->validate([
-            'nip' => ['required', 'string'],
+            'nip' => ['nullable', 'string', 'required_without_all:email,identifier,username'],
+            'email' => ['nullable', 'string', 'required_without_all:nip,identifier,username'],
+            'identifier' => ['nullable', 'string', 'required_without_all:nip,email,username'],
+            'username' => ['nullable', 'string', 'required_without_all:nip,email,identifier'],
             'password' => ['required'],
         ]);
 
-        $identifier = trim((string) $credentials['nip']);
+        $identifier = trim((string) (
+            $credentials['identifier']
+            ?? $credentials['username']
+            ?? $credentials['nip']
+            ?? $credentials['email']
+            ?? ''
+        ));
         $password = trim((string) $credentials['password']);
 
         $user = User::where('nip', $identifier)
@@ -25,7 +37,7 @@ class AuthWebController extends Controller
 
         $storedPassword = $user?->password ?? '$2y$10$'.str_repeat('a', 53);
         if (! Hash::check($password, $storedPassword) || ! $user) {
-            return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
+            return response()->json(['message' => 'The provided credentials are incorrect.'], 401);
         }
 
         // Check if user is approved
@@ -41,7 +53,10 @@ class AuthWebController extends Controller
                 'status_pengguna' => $user->status_pengguna
             ]);
             
-            return response()->json(['message' => $approvalMessage], 422);
+            return response()->json([
+                'message' => $approvalMessage,
+                'status_approval' => $user->status_approval,
+            ], 403);
         }
 
         // Create API token for frontend
@@ -83,6 +98,8 @@ class AuthWebController extends Controller
                 'status_pengguna' => ['required', 'string'],
             ]);
 
+            $isAdminRegistration = mb_strtolower(trim((string) ($validated['status_pengguna'] ?? ''))) === 'admin';
+
             // Trim whitespace from all string fields to prevent login failures
             foreach (['name', 'nip', 'email', 'pangkat_golongan', 'jabatan', 'instansi', 'no_wa', 'daftar_sebagai', 'status_pengguna'] as $field) {
                 if (isset($validated[$field])) {
@@ -111,14 +128,17 @@ class AuthWebController extends Controller
                 'daftar_sebagai' => $validated['daftar_sebagai'],
                 'organization_detail' => $validated['organization_detail'] ?? null,
                 'status_pengguna' => $validated['status_pengguna'],
-                'status_approval' => 'pending', // Default status is pending
+                // Admin has immediate access (no pending approval)
+                'status_approval' => $isAdminRegistration ? 'approved' : 'pending',
             ]);
 
             \Log::info('User registered successfully', ['user_id' => $user->id, 'nip' => $user->nip]);
 
             return response()->json([
-                'message' => 'User registered successfully. Please wait for admin approval.',
-                'status' => 'pending_approval'
+                'message' => $isAdminRegistration
+                    ? 'Admin registered successfully.'
+                    : 'User registered successfully. Please wait for admin approval.',
+                'status' => $isAdminRegistration ? 'approved' : 'pending_approval',
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::warning('Validation failed on register', $e->errors());

@@ -11,6 +11,23 @@ class SiteSettingController extends Controller
 {
     private const ALLOWED_KEYS = ['konsultasi_image', 'produk_image', 'produk_image_1', 'produk_image_2', 'produk_image_3', 'produk_image_4', 'login_logo_kemenkumham', 'login_logo_ditjen', 'home_logo'];
 
+    private function appBaseUrl(): string
+    {
+        return rtrim((string) config('app.url', ''), '/');
+    }
+
+    private function makePublicUrl(string $path): string
+    {
+        if (preg_match('/^https?:\\/\\//i', $path)) {
+            return $path;
+        }
+
+        $baseUrl = $this->appBaseUrl();
+        $path = ltrim($path, '/');
+
+        return $baseUrl !== '' ? ($baseUrl . '/' . $path) : url($path);
+    }
+
     private function isAdmin($user): bool
     {
         if (!$user) {
@@ -29,8 +46,20 @@ class SiteSettingController extends Controller
         foreach (self::ALLOWED_KEYS as $key) {
             $value = SiteSetting::getValue($key);
             if ($value) {
-                // Use asset() for consistent URL generation
-                $result[$key] = asset($value);
+                // Build URLs based on APP_URL to avoid incorrect https detection behind proxies.
+                // Values can be stored as:
+                // - "images/..." (stored in public/images)
+                // - "site/..."   (stored in storage/app/public/site via public disk)
+                // - absolute URLs
+                if (preg_match('/^https?:\\/\\//i', $value)) {
+                    $result[$key] = $value;
+                } elseif (str_starts_with($value, 'images/')) {
+                    $result[$key] = $this->makePublicUrl($value);
+                } elseif (Storage::disk('public')->exists($value)) {
+                    $result[$key] = $this->makePublicUrl('storage/' . ltrim($value, '/'));
+                } else {
+                    $result[$key] = $this->makePublicUrl($value);
+                }
             } else {
                 $result[$key] = null;
             }
@@ -69,7 +98,7 @@ class SiteSettingController extends Controller
             'message' => 'Gambar berhasil diperbarui.',
             'data' => [
                 'key' => $key,
-                'url' => Storage::disk('public')->url($setting->value),
+                'url' => $this->makePublicUrl('storage/' . ltrim($setting->value, '/')),
             ],
         ]);
     }
@@ -291,7 +320,7 @@ class SiteSettingController extends Controller
 
                     $updatedLogos[$key] = [
                         'url' => 'images/' . $imageName,
-                        'full_url' => asset('images/' . $imageName)
+                        'full_url' => $this->makePublicUrl('images/' . $imageName),
                     ];
                     
                     \Log::info('Updated logo record', ['key' => $key, 'url' => 'images/' . $imageName]);
