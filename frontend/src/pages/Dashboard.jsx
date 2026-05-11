@@ -152,13 +152,22 @@ export default function Dashboard() {
                   Dashboard
                 </a>
                 {isPsikolog ? (
-                  <a
-                    href="/consultation-psikolog"
-                    className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
-                  >
-                    <ClipboardList className="w-4 h-4 flex-shrink-0" />
-                    Konsultasi Psikolog
-                  </a>
+                  <>
+                    <a
+                      href="/consultation-psikolog"
+                      className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
+                    >
+                      <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                      Konsultasi Psikolog
+                    </a>
+                    <a
+                      href="/consultation-teknis"
+                      className="flex items-center gap-3 px-4 py-2.5 text-gray-600 hover:bg-gray-50 transition text-sm border-l-4 border-transparent"
+                    >
+                      <ClipboardList className="w-4 h-4 flex-shrink-0" />
+                      Konsultasi Teknis
+                    </a>
+                  </>
                 ) : (
                   <>
                     <a
