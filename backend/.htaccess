@@ -1,0 +1,51 @@
+# ===========================================================
+# SECURITY HARDENING - Backend Root (prevent source exposure)
+# ===========================================================
+
+# Disable directory listing / directory browsing
+Options -Indexes
+
+# Block .env files from public access
+<FilesMatch "^\.env">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block all dot-files/folders (.git, .gitignore, etc.)
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block other sensitive files (backups, configs, logs, SQL dumps)
+<FilesMatch "(^#.*#|~$|\.(bak|config|dist|fla|inc|ini|log|psd|sh|sql|sw[op]|env|env\.local|env\.backup|env\.production|gitignore|gitattributes|md|lock|json|xml|yml|yaml|toml))$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Explicitly block VCS
+    RewriteRule ^\.git - [F,L]
+    RewriteRule ^\.git/ - [F,L]
+
+    # Block access to sensitive directories when backend/ is exposed
+    RewriteRule ^vendor(/.*)?$ - [F,L]
+    RewriteRule ^node_modules(/.*)?$ - [F,L]
+    RewriteRule ^storage(/.*)?$ - [F,L]
+    RewriteRule ^bootstrap(/.*)?$ - [F,L]
+    RewriteRule ^config(/.*)?$ - [F,L]
+    RewriteRule ^database(/.*)?$ - [F,L]
+    RewriteRule ^resources(/.*)?$ - [F,L]
+    RewriteRule ^routes(/.*)?$ - [F,L]
+    RewriteRule ^tests(/.*)?$ - [F,L]
+    RewriteRule ^app(/.*)?$ - [F,L]
+
+    # If the server document root is mistakenly set to backend/,
+    # rewrite everything to backend/public/
+    RewriteCond %{REQUEST_URI} !^/public/ [NC]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

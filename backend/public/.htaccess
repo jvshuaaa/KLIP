@@ -1,20 +1,36 @@
-# Block access to sensitive files (.env, .git, etc.)
+# ===========================================================
+# SECURITY HARDENING - Backend Public Folder
+# ===========================================================
+
+# ----- 1. Block .env files from public access -----
+<FilesMatch "^\.env">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ----- 2. Block all dot-files (.git, .gitignore, etc.) -----
 <FilesMatch "^\.">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
-# Block specific sensitive files
-<FilesMatch "(^#.*#|\.(bak|config|dist|fla|inc|ini|log|psd|sh|sql|sw[op]|env|env\.local|gitignore|gitattributes))$">
+# Block sensitive file types
+<FilesMatch "(^#.*#|~$|\.(bak|config|dist|fla|inc|ini|log|psd|sh|sql|sw[op]|env|env\.local|gitignore|gitattributes|md|lock|toml))$">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
-# Disable directory browsing
+# Block PHP info/debug files (should not exist in production)
+<FilesMatch "^(phpinfo|info|debug|test|adminer)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ----- 3. Disable directory listing -----
 Options -Indexes
 
-# Block access to sensitive directories
-RedirectMatch 403 ^/(storage|bootstrap|config|database|resources|routes|tests|vendor|assets)/.*$
+# ----- 4. Block sensitive directories -----
+RedirectMatch 403 ^/(storage|bootstrap|config|database|resources|routes|tests|vendor|app)/
 
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
@@ -22,6 +38,12 @@ RedirectMatch 403 ^/(storage|bootstrap|config|database|resources|routes|tests|ve
     </IfModule>
 
     RewriteEngine On
+
+    # ----- 5. Force HTTPS (skip for localhost/dev) -----
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP_HOST} !^localhost
+    RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
@@ -41,3 +63,34 @@ RedirectMatch 403 ^/(storage|bootstrap|config|database|resources|routes|tests|ve
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ----- 6. Security Headers -----
+<IfModule mod_headers.c>
+    # Prevent MIME-type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Prevent clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Enable XSS filter
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Control referrer information
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Permissions Policy
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+    # HSTS - enforce HTTPS for 1 year
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-ancestors 'self'"
+
+    # Remove server info headers
+    Header always unset X-Powered-By
+    Header always unset Server
+</IfModule>
+
+# Hide server signature
+ServerSignature Off

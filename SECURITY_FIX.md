@@ -49,9 +49,18 @@ sudo systemctl restart apache2
 | Vulnerability | Status | File Diubah |
 |--------------|--------|-------------|
 | .env exposure | ✅ Fixed | `public/.htaccess` |
+| Source/config exposure jika DocumentRoot salah | ✅ Fixed | `backend/.htaccess` |
 | Directory listing | ✅ Fixed | `public/assets/.htaccess` |
 | Error message leak | ✅ Fixed | `bootstrap/app.php` |
 | Security Headers | ✅ Fixed | `SecurityHeaders.php` (sudah ada) |
 | HTTPS | ⚠️ Manual Setup | Requires SSL Certificate |
 
 **Catatan:** File `.env` harus diubah manual di server karena tidak masuk git.
+
+## Tambahan penting (VA/Hardening)
+
+- Jangan pernah expose folder project root ke publik. Pastikan webroot menunjuk ke:
+  - `.../backend/public` untuk API
+  - `.../public` untuk app utama (jika dipakai)
+- Jika pakai **Nginx**, `.htaccess` tidak dibaca. Gunakan contoh config di `deploy/nginx/laravel-public-only-example.conf`.
+- Pastikan `.git/` tidak ikut ter-deploy ke server production.

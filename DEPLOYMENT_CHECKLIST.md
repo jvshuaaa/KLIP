@@ -288,6 +288,10 @@ npm run dev
 scp -r backend/* user@server:/var/www/app/backend/
 scp -r frontend/dist/* user@server:/var/www/app/frontend/
 
+# IMPORTANT: jangan upload `.git/` ke production.
+# Jika pakai rsync, gunakan exclude:
+# rsync -av --delete --exclude ".git" --exclude "node_modules" backend/ user@server:/var/www/app/backend/
+
 # 2. SSH into server
 ssh user@server
 
@@ -345,6 +349,14 @@ server {
 
 ## 🔒 Security Checklist
 
+- [ ] **Web root hanya `public/`**
+  - Backend API: `.../backend/public`
+  - Frontend/utama (jika Laravel): `.../public`
+- [ ] **Block akses publik ke `.env`**
+- [ ] **Hapus `.git/` dari server production**
+- [ ] **Nonaktifkan directory listing**
+- [ ] **Aktifkan HTTPS + SSL certificate** (redirect 80→443)
+- [ ] **Tambahkan security headers** (CSP, HSTS, X-Frame-Options, dll)
 - [ ] HTTPS enabled on all domains
 - [ ] CORS properly configured
 - [ ] Rate limiting enabled
