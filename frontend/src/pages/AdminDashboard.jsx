@@ -8,7 +8,7 @@ import {
   MessageSquare,
   BookOpen,
   Image,
-  ImagePlay,
+  Play,
   ArrowLeft,
   LayoutGrid,
   Sparkles,
